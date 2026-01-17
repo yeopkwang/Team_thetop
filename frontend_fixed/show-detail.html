@@ -1,0 +1,11 @@
+﻿<!DOCTYPE html><html><head><meta charset="UTF-8"><title>공연 상세</title><link rel="stylesheet" href="styles.css"></head><body>
+<header><div class="logo">공연 상세</div><nav class="nav"><a href="/shows.html">목록</a></nav></header>
+<main style="padding:24px;"><div id="content" class="card"></div></main>
+<script src="js/api.js"></script>
+<script>
+(async()=>{
+  const id=new URLSearchParams(location.search).get('id');
+  const s=await apiGet('/shows/'+id);
+  document.getElementById('content').innerHTML=`<h1>${s.title}</h1>${s.posterUrl?`<img src="${s.posterUrl}" style="max-width:320px;">`:''}<p>${s.content||''}</p>`;
+})();
+</script></body></html>
