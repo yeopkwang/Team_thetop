@@ -36,9 +36,10 @@ async function main() {
 
   // sample show and session
   const sampleShow = await prisma.show.upsert({
-    where: { title: "Sample Show" },
+    where: { id: "sample-show" },
     update: {},
     create: {
+      id: "sample-show",
       title: "Sample Show",
       description: "테스트 공연",
       startDate: new Date(),

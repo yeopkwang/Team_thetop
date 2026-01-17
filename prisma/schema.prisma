@@ -1,4 +1,4 @@
-﻿// Prisma schema for 공연 예약 웹
+// Prisma schema for 공연 예약 웹
 
 generator client {
   provider = "prisma-client-js"
@@ -71,7 +71,6 @@ model User {
   roleRequests         RoleRequest[]
   handledRoleRequests  RoleRequest[] @relation("HandledBy")
   reservations         Reservation[]
-  tickets              Ticket[]
   photoPosts           PhotoPost[]
   auditLogs            AuditLog[] @relation("AuditUser")
   accounts             Account[]
