@@ -1,0 +1,22 @@
+﻿<!DOCTYPE html><html><head><meta charset="UTF-8"><title>로그인/회원가입</title><link rel="stylesheet" href="styles.css"></head><body>
+<header><div class="logo">Auth</div><nav class="nav"><a href="/">홈</a></nav></header>
+<main style="padding:24px; display:grid; gap:24px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">
+  <section class="card"><h3>로그인</h3>
+    <form id="loginForm"><input name="email" placeholder="email"><input name="password" type="password" placeholder="password"><button class="btn">로그인</button></form>
+    <div id="loginMsg"></div>
+  </section>
+  <section class="card"><h3>회원가입</h3>
+    <form id="signupForm"><input name="name" placeholder="name"><input name="email" placeholder="email"><input name="password" type="password" placeholder="password"><button class="btn">회원가입</button></form>
+    <div id="signupMsg"></div>
+  </section>
+</main>
+<script src="js/api.js"></script>
+<script>
+loginForm.onsubmit=async e=>{e.preventDefault(); const fd=new FormData(loginForm); try{
+  const r=await apiPost('/auth/login',{email:fd.get('email'),password:fd.get('password')}); localStorage.setItem('token',r.token); loginMsg.textContent='로그인 성공'; location.href='/';
+}catch(err){ loginMsg.textContent=err.error||'실패'; }};
+signupForm.onsubmit=async e=>{e.preventDefault(); const fd=new FormData(signupForm); try{
+  const r=await apiPost('/auth/signup',{email:fd.get('email'),name:fd.get('name'),password:fd.get('password')}); localStorage.setItem('token',r.token); signupMsg.textContent='가입 성공'; location.href='/';
+}catch(err){ signupMsg.textContent=err.error||'실패'; }};
+</script></body></html>
+
