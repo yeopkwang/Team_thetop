@@ -6,6 +6,7 @@ const links = [
   { href: "/admin/checkin", label: "검표" },
   { href: "/admin/templates", label: "티켓 템플릿" },
   { href: "/admin/roles", label: "권한 관리" },
+  { href: "/admin/shows", label: "공연/지난공연 게시" },
 ];
 
 export default function AdminDashboard() {

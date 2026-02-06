@@ -12,7 +12,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: "/", label: "홈", icon: "🏠" },
   { href: "/book", label: "예매·예약", icon: "🎫" },
-  { href: "/login", label: "로그인", icon: "🔐" },
+  { href: "/admin", label: "관리", icon: "🛠️" },
 ];
 
 function Item({ item, variant }: { item: NavItem; variant?: "mobile" | "desktop" }) {
