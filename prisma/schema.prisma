@@ -75,6 +75,7 @@ model User {
   auditLogs            AuditLog[] @relation("AuditUser")
   accounts             Account[]
   sessions             Session[]
+  credential           Credential?
 }
 
 model Role {
@@ -292,4 +293,13 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Credential {
+  id           String @id @default(cuid())
+  userId       String @unique
+  username     String @unique
+  passwordHash String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

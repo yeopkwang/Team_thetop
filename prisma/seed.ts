@@ -1,4 +1,5 @@
-﻿import { PrismaClient, RoleType, TicketTemplateScope } from "@prisma/client";
+import { PrismaClient, RoleType, TicketTemplateScope } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -14,6 +15,9 @@ async function main() {
     });
   }
 
+  const userRole = await prisma.role.findUnique({ where: { type: RoleType.USER } });
+  const superRole = await prisma.role.findUnique({ where: { type: RoleType.SUPER_ADMIN } });
+
   // seed super admin user
   const superAdmin = await prisma.user.upsert({
     where: { kakaoId: superAdminKakaoId },
@@ -25,12 +29,31 @@ async function main() {
     },
   });
 
-  const superRole = await prisma.role.findUnique({ where: { type: RoleType.SUPER_ADMIN } });
   if (superRole) {
     await prisma.userRole.upsert({
       where: { userId_roleId_isActive: { userId: superAdmin.id, roleId: superRole.id, isActive: true } },
       update: {},
       create: { userId: superAdmin.id, roleId: superRole.id },
+    });
+  }
+
+  // seed test login user (credentials: id: test / pw: test)
+  const testPasswordHash = await bcrypt.hash("test", 10);
+  const testUser = await prisma.user.upsert({
+    where: { email: "test@example.com" },
+    update: { name: "TEST USER", nickname: "test" },
+    create: { email: "test@example.com", name: "TEST USER", nickname: "test" },
+  });
+  await prisma.credential.upsert({
+    where: { username: "test" },
+    update: { passwordHash: testPasswordHash, userId: testUser.id },
+    create: { username: "test", passwordHash: testPasswordHash, userId: testUser.id },
+  });
+  if (userRole) {
+    await prisma.userRole.upsert({
+      where: { userId_roleId_isActive: { userId: testUser.id, roleId: userRole.id, isActive: true } },
+      update: {},
+      create: { userId: testUser.id, roleId: userRole.id },
     });
   }
 
@@ -67,6 +90,33 @@ async function main() {
       imageUrl: "/ticket-template.png",
     },
   });
+
+  // sample past shows for 홈 화면
+  const pastShows = [
+    {
+      id: "past-1",
+      title: "겨울 정기 공연",
+      description: "지난 겨울 뜨거운 무대를 다시 보기",
+      startDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 120),
+      endDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 119),
+      isActive: false,
+    },
+    {
+      id: "past-2",
+      title: "여름 콘서트",
+      description: "여름밤을 달군 라이브",
+      startDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 240),
+      endDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 239),
+      isActive: false,
+    },
+  ];
+  for (const show of pastShows) {
+    await prisma.show.upsert({
+      where: { id: show.id },
+      update: show,
+      create: show,
+    });
+  }
 
   console.log("Seed completed");
 }

@@ -1,5 +1,7 @@
-﻿import NextAuth, { NextAuthOptions } from "next-auth";
+import NextAuth, { NextAuthOptions } from "next-auth";
 import KakaoProvider from "next-auth/providers/kakao";
+import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
 import { RoleType } from "@prisma/client";
@@ -32,6 +34,27 @@ export const authOptions: NextAuthOptions = {
     KakaoProvider({
       clientId: process.env.KAKAO_CLIENT_ID || "",
       clientSecret: process.env.KAKAO_CLIENT_SECRET || "",
+    }),
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        username: { label: "ID", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.username || !credentials?.password) return null;
+        const credential = await prisma.credential.findUnique({
+          where: { username: credentials.username },
+          include: { user: true },
+        });
+        if (!credential?.passwordHash || !credential.user) return null;
+
+        const isValid = await bcrypt.compare(credentials.password, credential.passwordHash);
+        if (!isValid) return null;
+
+        await ensureRoles(credential.user.id, credential.user.kakaoId);
+        return credential.user as any;
+      },
     }),
   ],
   pages: {
@@ -68,6 +91,9 @@ export const authOptions: NextAuthOptions = {
           },
         });
         await ensureRoles(user.id, account.providerAccountId);
+      }
+      if (account?.provider === "credentials") {
+        await ensureRoles(user.id, (user as any).kakaoId);
       }
       return true;
     },

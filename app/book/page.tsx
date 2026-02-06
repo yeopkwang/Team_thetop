@@ -1,6 +1,9 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
 
 interface ShowSession {
   id: string;
@@ -18,6 +21,8 @@ interface Show {
 }
 
 export default function BookPage() {
+  const router = useRouter();
+  const { status } = useSession();
   const [shows, setShows] = useState<Show[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +31,13 @@ export default function BookPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/login?callbackUrl=/book");
+    }
+  }, [status, router]);
+
+  useEffect(() => {
+    if (status === "loading" || status === "unauthenticated") return;
     const load = async () => {
       try {
         const res = await fetch("/api/book/shows");
@@ -39,7 +51,7 @@ export default function BookPage() {
       }
     };
     load();
-  }, []);
+  }, [status]);
 
   const submit = async () => {
     setMessage(null);
@@ -58,12 +70,25 @@ export default function BookPage() {
     }
   };
 
-  if (loading) return <main className="container-base">불러오는 중...</main>;
+  if (status === "loading" || loading) return <main className="container-base">불러오는 중...</main>;
+  if (status === "unauthenticated") return null;
   if (error) return <main className="container-base">오류: {error}</main>;
 
   return (
     <main className="container-base space-y-6">
-      <h1 className="text-2xl font-bold">BOOK</h1>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <p className="text-sm text-slate-500">예매 · 예약</p>
+          <h1 className="text-2xl font-bold">공연 예약하기</h1>
+          <p className="text-sm text-slate-600">관리자가 올린 회차를 선택하고 예약을 진행하세요.</p>
+        </div>
+        <Link
+          href="/mypage"
+          className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+        >
+          내 예약 확인
+        </Link>
+      </div>
       <div className="grid gap-4">
         {shows.map((show) => (
           <div key={show.id} className="rounded-lg bg-white shadow p-4 space-y-2">
@@ -92,13 +117,13 @@ export default function BookPage() {
           </div>
         ))}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
         <input
           type="number"
           min={1}
           value={qty}
           onChange={(e) => setQty(Number(e.target.value))}
-          className="border rounded px-2 py-1 w-24"
+          className="border rounded px-3 py-2 w-28"
         />
         <button
           onClick={submit}
