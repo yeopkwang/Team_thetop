@@ -11,9 +11,7 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 };
-
-module.exports = nextConfig; // .mjs 파일이면 export default nextConfig;
-
+export default nextConfig;
 
 
 
