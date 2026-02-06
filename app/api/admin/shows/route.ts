@@ -10,13 +10,15 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const { title, description, startDate, endDate, isActive } = body;
+  const { title, description, startDate, endDate, isActive, coverImage, content } = body;
   if (!title) return NextResponse.json({ error: "title required" }, { status: 400 });
 
   const show = await prisma.show.create({
     data: {
       title,
       description: description || null,
+      coverImage: coverImage || null,
+      content: content || null,
       startDate: startDate ? new Date(startDate) : null,
       endDate: endDate ? new Date(endDate) : null,
       isActive: !!isActive,
@@ -27,12 +29,20 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   const body = await req.json();
-  const { id, isActive } = body;
+  const { id, isActive, title, description, coverImage, content, startDate, endDate } = body;
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
   const show = await prisma.show.update({
     where: { id },
-    data: { isActive: !!isActive },
+    data: {
+      isActive: typeof isActive === "boolean" ? isActive : undefined,
+      title: title ?? undefined,
+      description: description ?? undefined,
+      coverImage: coverImage ?? undefined,
+      content: content ?? undefined,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+    },
   });
   return NextResponse.json({ show });
 }

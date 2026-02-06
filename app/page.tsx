@@ -56,6 +56,11 @@ export default async function HomePage() {
           )}
           {upcoming.map((show) => (
             <div key={show.id} className="rounded-xl bg-white shadow hover:shadow-lg transition p-4 space-y-3">
+              {show.coverImage && (
+                <div className="h-40 rounded-lg overflow-hidden border">
+                  <img src={show.coverImage} alt={show.title} className="w-full h-full object-cover" />
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-slate-900 text-white text-xs px-2 py-1">예정</span>
                 <span className="text-sm text-slate-500">{formatDate(show.startDate)}</span>
@@ -91,6 +96,11 @@ export default async function HomePage() {
           )}
           {past.map((show) => (
             <div key={show.id} className="rounded-xl bg-white shadow hover:shadow-lg transition p-4 space-y-2">
+              {show.coverImage && (
+                <div className="h-32 rounded-lg overflow-hidden border">
+                  <img src={show.coverImage} alt={show.title} className="w-full h-full object-cover" />
+                </div>
+              )}
               <div className="flex items-center gap-2 text-xs text-slate-500">
                 <span className="rounded-full bg-slate-100 px-2 py-1">지난 공연</span>
                 <span>{formatDate(show.startDate)}</span>

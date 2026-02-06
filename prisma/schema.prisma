@@ -115,6 +115,8 @@ model Show {
   id          String        @id @default(cuid())
   title       String
   description String?
+  coverImage  String?
+  content     String?
   startDate   DateTime?
   endDate     DateTime?
   isActive    Boolean       @default(true)
