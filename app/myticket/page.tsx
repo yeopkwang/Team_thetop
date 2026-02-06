@@ -1,4 +1,5 @@
-﻿import { redirect } from "next/navigation";
+import { redirect } from "next/navigation";
+import QRCode from "qrcode";
 
 async function loadTicket() {
   const res = await fetch(`${process.env.NEXTAUTH_URL || ""}/api/me`, { cache: "no-store" });
@@ -16,14 +17,16 @@ export default async function MyTicketPage() {
     return <main className="container-base">활성 티켓이 없습니다.</main>;
   }
 
+  const qrDataUrl = await QRCode.toDataURL(data.ticket.qrToken || "EMPTY");
+
   return (
     <main className="container-base space-y-6">
       <h1 className="text-2xl font-bold">MYTICKET</h1>
       <div className="rounded bg-white shadow p-4 space-y-4">
         <div className="text-sm text-slate-600">QR 토큰</div>
         <div className="text-lg font-mono break-all">{data.ticket.qrToken}</div>
-        <div className="w-48 h-48 mx-auto bg-slate-100 flex items-center justify-center">
-          <span className="text-xs text-slate-500">QR: {data.ticket.qrToken.slice(0, 8)}...</span>
+        <div className="w-48 h-48 mx-auto bg-white flex items-center justify-center rounded border">
+          <img src={qrDataUrl} alt="QR code" className="w-full h-full object-contain p-2" />
         </div>
       </div>
       <div className="space-y-2">
