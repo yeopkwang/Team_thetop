@@ -71,6 +71,8 @@ CREATE TABLE "Show" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT,
+    "coverImage" TEXT,
+    "content" TEXT,
     "startDate" TIMESTAMP(3),
     "endDate" TIMESTAMP(3),
     "isActive" BOOLEAN NOT NULL DEFAULT true,
@@ -253,6 +255,16 @@ CREATE TABLE "VerificationToken" (
     "expires" TIMESTAMP(3) NOT NULL
 );
 
+-- CreateTable
+CREATE TABLE "Credential" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "username" TEXT NOT NULL,
+    "passwordHash" TEXT NOT NULL,
+
+    CONSTRAINT "Credential_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_kakaoId_key" ON "User"("kakaoId");
 
@@ -291,6 +303,12 @@ CREATE UNIQUE INDEX "Session_sessionToken_key" ON "Session"("sessionToken");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "VerificationToken"("identifier", "token");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Credential_userId_key" ON "Credential"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Credential_username_key" ON "Credential"("username");
 
 -- AddForeignKey
 ALTER TABLE "UserRole" ADD CONSTRAINT "UserRole_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -345,3 +363,6 @@ ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId"
 
 -- AddForeignKey
 ALTER TABLE "Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Credential" ADD CONSTRAINT "Credential_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
