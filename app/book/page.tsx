@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import Link from "next/link";
 
 interface ShowSession {
@@ -21,8 +19,6 @@ interface Show {
 }
 
 export default function BookPage() {
-  const router = useRouter();
-  const { status } = useSession();
   const [shows, setShows] = useState<Show[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,13 +27,6 @@ export default function BookPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.replace("/login?callbackUrl=/book");
-    }
-  }, [status, router]);
-
-  useEffect(() => {
-    if (status === "loading" || status === "unauthenticated") return;
     const load = async () => {
       try {
         const res = await fetch("/api/book/shows");
@@ -51,7 +40,7 @@ export default function BookPage() {
       }
     };
     load();
-  }, [status]);
+  }, []);
 
   const submit = async () => {
     setMessage(null);
@@ -70,8 +59,7 @@ export default function BookPage() {
     }
   };
 
-  if (status === "loading" || loading) return <main className="container-base">불러오는 중...</main>;
-  if (status === "unauthenticated") return null;
+  if (loading) return <main className="container-base">불러오는 중...</main>;
   if (error) return <main className="container-base">오류: {error}</main>;
 
   return (
