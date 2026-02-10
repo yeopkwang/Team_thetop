@@ -1,65 +1,624 @@
-﻿<!DOCTYPE html>
-<html>
+<!DOCTYPE html>
+<html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>작전명문 홈 (데모)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>작전명;문 4 - 공연 예매</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<header>
-  <div class="logo">작전명문</div>
-  <nav class="nav">
-    <a href="#shows">공연안내</a>
-    <a href="#videos">영상</a>
-    <a href="#tickets">마이 티켓</a>
-  </nav>
-</header>
-<main style="padding:24px;">
-  <section id="shows"><h2>최신 공연 공지</h2><div class="grid" id="show-cards"></div></section>
-  <section id="videos"><h2>유튜브 영상</h2><div class="grid" id="video-cards"></div></section>
-  <section id="timeline"><h2>밴드 타임라인</h2><div id="timeline-cards"></div></section>
-  <section id="tickets"><h2>내 티켓</h2><div id="my-ticket-card"></div></section>
-</main>
-<div id="modal" style="display:none;"></div>
-<script src="js/api.js"></script>
-<script>
-const timelineData=[
-  {year:'2019',text:'결성 및 첫 소극장 공연'},
-  {year:'2020',text:'첫 EP 발매, 온라인 라이브'},
-  {year:'2022',text:'여름 페스티벌 메인 스테이지'},
-  {year:'2023',text:'극장형 콘서트 투어'}
-];
-(function render(){
-  const shows = MOCK.shows;
-  document.getElementById('show-cards').innerHTML = shows.map(s=>
-    <article class="card">
-      <div class="tag">공지</div><h3></h3>
-      <p>...</p>
-    </article>).join('');
-  const videos = MOCK.videos;
-  const vc = document.getElementById('video-cards');
-  videos.forEach(v=>{
-    const div=document.createElement('div'); div.className='card';
-    div.innerHTML=<h4></h4><p></p><button class="btn" data-yt="">재생</button>;
-    div.querySelector('button').onclick=()=>openModal(v.youtubeId); vc.appendChild(div);
-  });
-  const tl=document.getElementById('timeline-cards');
-  tl.innerHTML=timelineData.map(i=><div class="card"><div class="tag"></div><p></p></div>).join('');
-  const t = MOCK.tickets[0];
-  if(t){
-    document.getElementById('my-ticket-card').innerHTML=<div class="ticket">
-      <div><div class="tag">내 티켓</div><h3></h3>
-      <p></p><p></p></div><div id="qr"></div></div>;
-    const sc=document.createElement('script'); sc.src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"; sc.onload=()=>{ QRCode.toCanvas(document.getElementById('qr'), t.ticketCode, {width:120}); }; document.body.appendChild(sc);
-  }
-})();
-function openModal(id){
-  const m=document.getElementById('modal');
-  m.innerHTML=<div class="modal" onclick="closeModal(event)">
-    <iframe src="https://www.youtube.com/embed/?autoplay=1" allowfullscreen></iframe></div>;
-  m.style.display='block';
-}
-function closeModal(e){ if(e.target.classList.contains('modal')){ const m=document.getElementById('modal'); m.innerHTML=''; m.style.display='none'; }}
-</script>
+  <header>
+    <div class="logo">반송고등학교 작전명문 홈페이지</div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab-btn" data-tab="my">마이 티켓</button>
+    <button class="tab-btn active" data-tab="home">공연 안내</button>
+    <button class="tab-btn" data-tab="login">로그인 / 회원가입</button>
+    <button class="tab-btn" data-tab="book">예매하기</button>
+    <button class="tab-btn" data-tab="admin">관리자 페이지</button>
+  </div>
+
+  <div id="auth-state" class="auth-state muted"></div>
+
+  <main id="tab-home" class="tab-panel">
+    <div class="container">
+      <section class="card hero-card">
+        <p class="eyebrow">현재 예매 가능한 공연</p>
+        <div class="hero-header">
+          <h1>작전명;문 4</h1>
+        </div>
+        <hr class="hero-rule" />
+        <div class="home-layout">
+          <div class="home-left">
+            <div class="hero-grid">
+              <div class="poster-wrap">
+                <img src="/uploads/sample-poster.png" alt="공연 포스터" class="poster" />
+              </div>
+              <div class="info-table">
+                <div class="info-rows">
+                  <div class="info-row">
+                    <div class="info-label">일시</div>
+                    <div class="info-value">2026년 02월 22일 (일)</div>
+                  </div>
+                  <div class="info-row">
+                    <div class="info-label">시간</div>
+                    <div class="info-value">
+                      <span>18:00 ~ 21:00</span>
+                      <span class="info-sub">인터미션 포함 / 입장 가능 17:30</span>
+                    </div>
+                  </div>
+                  <div class="info-row">
+                    <div class="info-label">장소</div>
+                    <div class="info-value">
+                      <span>공덕 DGT 아트센터</span>
+                      <span class="info-sub">서울특별시 마포구 독막로 308</span>
+                    </div>
+                  </div>
+                  <div class="info-row">
+                    <div class="info-label">문의</div>
+                    <div class="info-value">
+                      <span>대표 이건형</span>
+                      <span class="info-sub">@band.bansong</span>
+                    </div>
+                  </div>
+                  <div class="info-row">
+                    <div class="info-label">입장 관련</div>
+                    <div class="info-value">관객 100명 · 전원 스탠딩</div>
+                  </div>
+                </div>
+                <div class="info-note">
+                  본 공연은 온라인 예매로 진행되며, 예매하신 티켓의 취소/환불 관련 사항은
+                  공연 안내 규정에 따라 적용됩니다.
+                </div>
+                <div class="hero-actions">
+                  <button class="btn full" id="cta-book">예매하기</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-tabs">
+              <div class="section-tab active" data-section="info">공연상세</div>
+              <div class="section-tab" data-section="sale">판매정보</div>
+            </div>
+            <div class="section-body" id="section-info">
+              작전명;문 4는 2023년을 시작으로 반송고등학교 재학생/졸업생이 함께 모여 만드는 밴드 공연입니다.
+              <div class="note" style="margin-top:12px;">예매 후 입금 확인이 완료되면 QR 티켓이 발급됩니다.</div>
+            </div>
+            <div class="section-body hidden" id="section-sale">
+              <strong>입장 안내</strong><br />
+              - 입장 시작: 17:30<br />
+              - 공연 시작: 18:00<br />
+              - 예매 후 24시간 내 미입금 시 자동 취소됩니다.
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <main id="tab-login" class="tab-panel hidden">
+    <div class="container">
+      <section class="card auth-card">
+        <h2>로그인 / 회원가입</h2>
+        <div id="login-forms">
+          <div class="btn-row">
+            <button class="btn secondary" id="login-tab-btn">로그인</button>
+            <button class="btn secondary" id="signup-tab-btn">회원가입</button>
+          </div>
+
+          <div id="login-form">
+            <label>이메일
+              <input id="login-email" placeholder="example@domain.com" autocomplete="email" />
+            </label>
+            <label>비밀번호
+              <input id="login-password" type="password" placeholder="비밀번호" autocomplete="current-password" />
+            </label>
+            <div class="btn-row">
+              <button class="btn" id="login-btn">로그인</button>
+            </div>
+          </div>
+
+          <div id="signup-form" class="hidden">
+            <label>이름
+              <input id="signup-name" placeholder="이름" />
+            </label>
+            <label>이메일
+              <input id="signup-email" placeholder="example@domain.com" autocomplete="email" />
+            </label>
+            <label>비밀번호
+              <input id="signup-password" type="password" placeholder="비밀번호" autocomplete="new-password" />
+            </label>
+            <label>전화번호
+              <input id="signup-phone" placeholder="숫자만 입력" />
+            </label>
+            <button class="btn" id="signup-btn">회원가입</button>
+          </div>
+        </div>
+
+        <div id="login-signed-in" class="hidden signed-in-box">
+          <div class="signed-in-title">이미 로그인되었습니다.</div>
+          <button class="btn secondary" id="logout-btn" type="button">로그아웃</button>
+        </div>
+
+        <div id="auth-msg" class="muted"></div>
+      </section>
+    </div>
+  </main>
+
+  <main id="tab-book" class="tab-panel hidden">
+    <div class="container">
+      <section class="card auth-card">
+        <h2>예매하기</h2>
+        <p class="muted">작전명;문 4 · DGT 아트센터 · 18:00~21:00</p>
+        <p class="muted" id="remain-text"></p>
+        <label>예매 수량을 선택해주세요.
+          <input id="book-qty" type="number" min="1" max="2" value="1" />
+        </label>
+        <button class="btn" id="book-btn">예매 진행</button>
+        <div id="book-msg" class="muted"></div>
+      </section>
+    </div>
+  </main>
+
+  <main id="tab-my" class="tab-panel hidden">
+    <div class="container">
+      <section class="card">
+        <h2>내 티켓</h2>
+        <div id="my-ticket-card" class="ticket-placeholder muted">예매 후 티켓이 발급됩니다.</div>
+      </section>
+    </div>
+  </main>
+
+  <main id="tab-admin" class="tab-panel hidden">
+    <div class="container">
+      <section class="card auth-card">
+        <h2>어드민</h2>
+        <p class="muted">입금 확인 대기 목록</p>
+        <div id="admin-pending-list" class="pending-list"></div>
+        <label>티켓 코드 입력 후 검표
+          <input id="admin-scan-code" placeholder="예: MOCK-TICKET-101" />
+        </label>
+        <button class="btn" id="admin-scan-btn">QR 스캔 처리</button>
+        <hr />
+        <label>입금 확인할 예매번호
+          <input id="admin-pay-code" placeholder="예: BOOK-001" />
+        </label>
+        <button class="btn secondary" id="admin-pay-btn">입금 확인/확정</button>
+        <div id="admin-msg" class="muted"></div>
+      </section>
+    </div>
+  </main>
+
+  <div id="ticket-modal" class="modal hidden">
+    <div class="modal-card">
+      <img id="ticket-image" src="/uploads/ticket-detail.png" alt="티켓 이미지" />
+      <button class="btn secondary" id="close-modal">닫기</button>
+    </div>
+  </div>
+
+  <div id="qr-modal" class="modal hidden">
+    <div class="modal-card qr-modal">
+      <div class="qr-title">QR 코드</div>
+      <div id="qr-canvas" class="qr-canvas"></div>
+      <img id="qr-fallback" class="qr-fallback hidden" alt="QR 코드" />
+      <div id="qr-code-text" class="qr-code-text"></div>
+      <button class="btn secondary" id="close-qr">닫기</button>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    const tabs = ['home', 'login', 'book', 'my', 'admin'];
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const hasBookedKey = 'hasBooked';
+    const ticketImagePath = '/uploads/ticket-detail.png';
+
+    function sanitizeTicketStorage() {
+      const raw = localStorage.getItem('latestTicket');
+      if (!raw) return;
+      if (raw.includes('\uFFFD')) {
+        localStorage.removeItem('latestTicket');
+        localStorage.removeItem(hasBookedKey);
+      }
+    }
+
+    tabButtons.forEach(btn => (btn.onclick = () => showTab(btn.dataset.tab)));
+    document.getElementById('cta-book').onclick = () => requireLoginThen('book');
+
+    function showTab(name) {
+      tabs.forEach(t => {
+        document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
+      });
+      tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === name));
+      if (name === 'my') renderMyTicket();
+      if (name === 'book') updateRemainText();
+      if (name === 'admin') loadAdminPending();
+    }
+
+    function requireLoginThen(tab) {
+      if (token()) showTab(tab);
+      else showTab('login');
+    }
+
+    function normalizeTicket(ticket) {
+      if (!ticket || !ticket.booking || !ticket.booking.event) return ticket;
+      const event = ticket.booking.event;
+      const fallbackTitle = '작전명;문 4 1회차';
+      const fallbackVenue = 'DGT 아트센터';
+      const looksBroken = (s) => !s || s.includes('\uFFFD');
+      if (looksBroken(event.title)) event.title = fallbackTitle;
+      if (looksBroken(event.venue)) event.venue = fallbackVenue;
+      return ticket;
+    }
+
+    function openTicketImage() {
+      const modal = document.getElementById('ticket-modal');
+      const img = document.getElementById('ticket-image');
+      img.src = ticketImagePath;
+      modal.classList.remove('hidden');
+    }
+
+    function closeTicketImage() {
+      document.getElementById('ticket-modal').classList.add('hidden');
+    }
+
+    async function refreshAuth() {
+      const state = document.getElementById('auth-state');
+      const logoutBtn = document.getElementById('logout-btn');
+      const loginForms = document.getElementById('login-forms');
+      const signedInBox = document.getElementById('login-signed-in');
+      if (!state || !logoutBtn) return null;
+
+      if (!token()) {
+        state.textContent = '';
+        logoutBtn.classList.add('hidden');
+        if (loginForms) loginForms.classList.remove('hidden');
+        if (signedInBox) signedInBox.classList.add('hidden');
+        return null;
+      }
+      try {
+        const r = await apiGet('/auth/me');
+        state.textContent = `${r.user.name} (${r.user.email}) 로그인됨`;
+        logoutBtn.classList.remove('hidden');
+        if (loginForms) loginForms.classList.add('hidden');
+        if (signedInBox) signedInBox.classList.remove('hidden');
+        return r.user;
+      } catch (e) {
+        localStorage.removeItem('token');
+        state.textContent = '';
+        logoutBtn.classList.add('hidden');
+        if (loginForms) loginForms.classList.remove('hidden');
+        if (signedInBox) signedInBox.classList.add('hidden');
+        return null;
+      }
+    }
+
+    async function handleLogin() {
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      const msg = document.getElementById('auth-msg');
+      msg.textContent = '로그인 중...';
+      try {
+        const r = await apiPost('/auth/login', { email, password });
+        localStorage.setItem('token', r.token);
+        msg.textContent = '로그인 성공';
+        await refreshAuth();
+        showTab('home');
+      } catch (e) {
+        console.error('login error', e);
+        msg.textContent = e.error || e.message || '로그인 실패';
+      }
+    }
+
+    async function handleSignup() {
+      const name = document.getElementById('signup-name').value.trim();
+      const email = document.getElementById('signup-email').value.trim();
+      const password = document.getElementById('signup-password').value;
+      const phone = document.getElementById('signup-phone').value.trim();
+      const msg = document.getElementById('auth-msg');
+
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        msg.textContent = '이메일 형식을 확인해주세요.';
+        return;
+      }
+      if (password.length < 6) {
+        msg.textContent = '비밀번호는 6자 이상 입력해주세요.';
+        return;
+      }
+      if (!/^\d{8,15}$/.test(phone)) {
+        msg.textContent = '전화번호는 숫자 8~15자리로 입력해주세요.';
+        return;
+      }
+
+      msg.textContent = '회원가입 중...';
+      try {
+        const r = await apiPost('/auth/signup', { name, email, password, phone });
+        localStorage.setItem('token', r.token);
+        msg.textContent = '회원가입 및 로그인 완료';
+        await refreshAuth();
+        showTab('home');
+      } catch (e) {
+        console.error('signup error', e);
+        msg.textContent = e.error || e.message || '회원가입 실패';
+      }
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('latestTicket');
+      localStorage.removeItem(hasBookedKey);
+      document.getElementById('auth-msg').textContent = '';
+      document.getElementById('logout-btn').classList.add('hidden');
+      const loginForms = document.getElementById('login-forms');
+      const signedInBox = document.getElementById('login-signed-in');
+      if (loginForms) loginForms.classList.remove('hidden');
+      if (signedInBox) signedInBox.classList.add('hidden');
+      refreshAuth();
+    }
+
+    function updateRemainText() {
+      const remain = getRemaining();
+      document.getElementById('remain-text').textContent = `잔여 좌석: ${remain} / 100`;
+    }
+
+    async function handleBook() {
+      if (!token()) {
+        showTab('login');
+        document.getElementById('book-msg').textContent = '로그인 후 예매 가능합니다.';
+        return;
+      }
+      const qty = Number(document.getElementById('book-qty').value || 1);
+      const msg = document.getElementById('book-msg');
+      msg.textContent = '예매 요청 중...';
+      try {
+        if (qty > 2) {
+          msg.textContent = '최대 2장까지 예매 가능합니다.';
+          return;
+        }
+        const result = await bookTickets(qty);
+        const payload = result && result.booking ? result : { booking: result?.booking || result, tickets: result?.tickets || [] };
+        const ticket = normalizeTicket(payload);
+        localStorage.setItem('latestTicket', JSON.stringify(ticket));
+        localStorage.setItem(hasBookedKey, '1');
+        msg.textContent = '예매 성공! 마이 티켓에서 확인하세요.';
+        renderMyTicket(ticket);
+        updateRemainText();
+        showTab('my');
+      } catch (e) {
+        msg.textContent = e.error || '예매 실패';
+        if ((e.error || '').includes('로그인')) showTab('login');
+      }
+    }
+
+    async function fetchLatestTicketFromServer() {
+      try {
+        const bookings = await apiGet('/my/bookings');
+        if (!Array.isArray(bookings) || bookings.length === 0) return null;
+        const latest = bookings.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+        const tickets = await apiGet('/my/tickets');
+        const filtered = Array.isArray(tickets)
+          ? tickets.filter(t => t.booking && t.booking.id === latest.id)
+          : [];
+        return { booking: latest, tickets: filtered };
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function renderMyTicket(ticket, opts = {}) {
+      const container = document.getElementById('my-ticket-card');
+      const data = normalizeTicket(ticket || JSON.parse(localStorage.getItem('latestTicket') || 'null'));
+
+      if (!token()) {
+        container.className = 'card';
+        container.innerHTML = '로그인 후 티켓을 확인하세요.';
+        return;
+      }
+      if (!opts.skipFetch) {
+        fetchLatestTicketFromServer().then(payload => {
+          if (payload) {
+            localStorage.setItem('latestTicket', JSON.stringify(payload));
+            localStorage.setItem(hasBookedKey, '1');
+            renderMyTicket(payload, { skipFetch: true });
+          }
+        });
+      }
+      if (localStorage.getItem(hasBookedKey) !== '1') {
+        container.className = 'card';
+        container.innerHTML = '예매 후 티켓이 발급됩니다.';
+        return;
+      }
+      if (!data) {
+        container.className = 'card';
+        container.innerHTML = '티켓이 없습니다.';
+        return;
+      }
+      const booking = data.booking || {};
+      const rawTitle = booking.event?.title || '작전명;문 4';
+      const title = rawTitle.replace(/\s*1회차\s*$/, '');
+      const time = booking.createdAt || new Date().toISOString();
+      const venue = booking.event?.venue || '공덕 DGT 아트센터';
+      const status = booking.status || 'PAYMENT_PENDING';
+      const statusText = status === 'CONFIRMED' ? '확인완료' : '확인대기';
+      const statusClass = status === 'CONFIRMED' ? 'status done' : 'status pending';
+      const tickets = Array.isArray(data.tickets) ? data.tickets : [];
+      const ticketCount = tickets.length || booking.quantity || 1;
+      const canShowQr = status === 'CONFIRMED' && tickets.length > 0;
+      const ticketItems = tickets.length
+        ? tickets
+        : Array.from({ length: ticketCount }, (_, i) => ({ id: `temp-${i + 1}`, ticketCode: '' }));
+
+      container.className = 'ticket-list';
+      container.innerHTML = ticketItems
+        .map((t, i) => `
+          <div class="ticket" data-ticket-id="${t.id}" data-ticket-code="${t.ticketCode || ''}">
+            <div class="ticket-head">
+              <span class="tag">내 티켓</span>
+              <span class="${statusClass}">${statusText}</span>
+            </div>
+            <h3>${title}</h3>
+            ${canShowQr && t.ticketCode ? `<div class="qr-hint">티켓을 눌러 QR 보기</div>` : ''}
+            <img class="ticket-sep" src="/uploads/sample_ticket.png" alt="티켓 이미지">
+            <p>구매시간: ${new Date(time).toLocaleString('ko-KR')}</p>
+            
+            <p class="muted">티켓 ${i + 1}</p>
+            ${!canShowQr ? '<div class="muted">입금 확인 대기</div>' : ''}
+          </div>
+        `).join('');
+
+      if (canShowQr) {
+        const ensureQrLib = () => {
+          if (window.QRCode) return Promise.resolve();
+          if (window.__qrLoading) return window.__qrLoading;
+          window.__qrLoading = new Promise((resolve, reject) => {
+            const sc = document.createElement('script');
+            sc.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+            sc.onload = () => resolve();
+            sc.onerror = () => reject();
+            document.body.appendChild(sc);
+          });
+          return window.__qrLoading;
+        };
+
+        container.querySelectorAll('.ticket').forEach(card => {
+          card.addEventListener('click', async () => {
+            const code = card.getAttribute('data-ticket-code');
+            if (!code) return;
+            await openQrModal(code);
+          });
+        });
+
+        async function openQrModal(code) {
+          const modal = document.getElementById('qr-modal');
+          const canvasWrap = document.getElementById('qr-canvas');
+          const codeText = document.getElementById('qr-code-text');
+          const imgFallback = document.getElementById('qr-fallback');
+
+          modal.classList.remove('hidden');
+          codeText.textContent = code;
+          canvasWrap.innerHTML = '';
+          imgFallback.classList.add('hidden');
+
+          try {
+            await ensureQrLib();
+            const canvas = document.createElement('canvas');
+            canvasWrap.appendChild(canvas);
+            QRCode.toCanvas(canvas, code, { width: 180 });
+          } catch (_) {
+            imgFallback.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(code)}`;
+            imgFallback.classList.remove('hidden');
+          }
+        }
+      }
+    }
+
+    function handleAdminScan() {
+      const code = document.getElementById('admin-scan-code').value.trim();
+      const msg = document.getElementById('admin-msg');
+      if (!code) {
+        msg.textContent = '코드를 입력해주세요.';
+        return;
+      }
+      msg.textContent = `QR ${code} 검표 처리 (임시).`;
+    }
+
+    function handleAdminPay() {
+      const code = document.getElementById('admin-pay-code').value.trim();
+      const msg = document.getElementById('admin-msg');
+      if (!code) {
+        msg.textContent = '예매번호를 입력해주세요.';
+        return;
+      }
+      msg.textContent = `예매 ${code} 입금 확인/확정 처리 (임시).`;
+    }
+
+    async function loadAdminPending() {
+      const wrap = document.getElementById('admin-pending-list');
+      if (!wrap) return;
+      wrap.textContent = '불러오는 중...';
+      try {
+        const list = await apiGet('/admin/bookings/pending');
+        if (!Array.isArray(list) || list.length === 0) {
+          wrap.textContent = '확인 대기 예약이 없습니다.';
+          return;
+        }
+        wrap.innerHTML = list
+          .map(({ booking }) => {
+            const createdAt = new Date(booking.createdAt).toLocaleString('ko-KR');
+            return `
+              <div class="pending-item">
+                <div>
+                  <strong>${booking.event?.title || '작전명;문 4 1회차'}</strong>
+                  <div class="muted">예약자: ${booking.user?.email || booking.user?.name || 'unknown'}</div>
+                  <div class="muted">구매시간: ${createdAt}</div>
+                </div>
+                <button class="btn" data-booking-id="${booking.id}">확인완료</button>
+              </div>
+            `;
+          })
+          .join('');
+        wrap.querySelectorAll('button[data-booking-id]').forEach(btn => {
+          btn.onclick = async () => {
+            const id = btn.getAttribute('data-booking-id');
+            btn.disabled = true;
+            try {
+              await apiPost(`/admin/bookings/${id}/confirm`, {});
+              loadAdminPending();
+            } catch (e) {
+              btn.disabled = false;
+              document.getElementById('admin-msg').textContent = e.error || '확인완료 처리 실패';
+            }
+          };
+        });
+      } catch (e) {
+        wrap.textContent = e.error || '대기 목록을 불러오지 못했습니다.';
+      }
+    }
+
+    const loginForm = document.getElementById('login-form');
+    const signupForm = document.getElementById('signup-form');
+    document.getElementById('login-tab-btn').onclick = () => {
+      loginForm.classList.remove('hidden');
+      signupForm.classList.add('hidden');
+    };
+    document.getElementById('signup-tab-btn').onclick = () => {
+      signupForm.classList.remove('hidden');
+      loginForm.classList.add('hidden');
+    };
+
+    document.querySelectorAll('.section-tab').forEach(tab => {
+      tab.onclick = () => {
+        const section = tab.getAttribute('data-section');
+        document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('section-info').classList.toggle('hidden', section !== 'info');
+        document.getElementById('section-sale').classList.toggle('hidden', section !== 'sale');
+      };
+    });
+
+    document.getElementById('login-btn').onclick = handleLogin;
+    document.getElementById('signup-btn').onclick = handleSignup;
+    document.getElementById('logout-btn').onclick = handleLogout;
+    document.getElementById('book-btn').onclick = handleBook;
+    document.getElementById('admin-scan-btn').onclick = handleAdminScan;
+    document.getElementById('admin-pay-btn').onclick = handleAdminPay;
+    document.getElementById('close-modal').onclick = closeTicketImage;
+    document.getElementById('ticket-modal').onclick = (e) => {
+      if (e.target && e.target.id === 'ticket-modal') closeTicketImage();
+    };
+    document.getElementById('close-qr').onclick = () => {
+      document.getElementById('qr-modal').classList.add('hidden');
+    };
+    document.getElementById('qr-modal').onclick = (e) => {
+      if (e.target && e.target.id === 'qr-modal') {
+        document.getElementById('qr-modal').classList.add('hidden');
+      }
+    };
+
+    sanitizeTicketStorage();
+    refreshAuth();
+    updateRemainText();
+  </script>
 </body>
 </html>

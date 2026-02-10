@@ -16,11 +16,12 @@ public class UserService implements org.springframework.security.core.userdetail
     this.repo = repo;
   }
 
-  public User signup(String email, String name, String rawPassword) {
+  public User signup(String email, String name, String rawPassword, String phone) {
     if (repo.findByEmail(email).isPresent()) throw new IllegalArgumentException("email exists");
     User u = new User();
     u.setEmail(email);
     u.setName(name);
+    u.setPhone(phone);
     u.setPassword(encoder.encode(rawPassword));
     return repo.save(u);
   }

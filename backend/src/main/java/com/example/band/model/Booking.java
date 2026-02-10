@@ -6,7 +6,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "bookings")
 public class Booking {
-  public enum Status { CONFIRMED, CANCELED }
+  public enum Status { PAYMENT_PENDING, CONFIRMED, CANCELED }
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -21,7 +21,7 @@ public class Booking {
   private int quantity;
 
   @Enumerated(EnumType.STRING)
-  private Status status = Status.CONFIRMED;
+  private Status status = Status.PAYMENT_PENDING;
 
   private Instant createdAt = Instant.now();
 

@@ -28,13 +28,17 @@ public class AuthController {
     this.userRepo = userRepo;
   }
 
-  public record SignupRequest(@NotBlank String email, @NotBlank String name, @NotBlank String password) {}
+  public record SignupRequest(@NotBlank String email, @NotBlank String name, @NotBlank String password, String phone) {}
 
   @PostMapping("/signup")
   public ResponseEntity<?> signup(@RequestBody SignupRequest req) {
-    User u = userService.signup(req.email(), req.name(), req.password());
-    String token = jwtService.generateToken(u.getEmail());
-    return ResponseEntity.ok(Map.of("token", token, "user", u));
+    try {
+      User u = userService.signup(req.email(), req.name(), req.password(), req.phone());
+      String token = jwtService.generateToken(u.getEmail());
+      return ResponseEntity.ok(Map.of("token", token, "user", u));
+    } catch (IllegalArgumentException e) {
+      return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
+    }
   }
 
   public record LoginRequest(String email, String password) {}

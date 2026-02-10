@@ -31,6 +31,7 @@ public class DataLoader implements CommandLineRunner {
       User a = new User();
       a.setEmail("admin@example.com");
       a.setName("Admin");
+      a.setPhone("010-0000-0000");
       a.setPassword(enc.encode("password"));
       a.setRole(User.Role.ADMIN);
       return userRepo.save(a);
@@ -39,6 +40,7 @@ public class DataLoader implements CommandLineRunner {
       User u = new User();
       u.setEmail("user@example.com");
       u.setName("Sample User");
+      u.setPhone("010-1111-1111");
       u.setPassword(enc.encode("password"));
       u.setRole(User.Role.USER);
       return userRepo.save(u);
@@ -46,29 +48,48 @@ public class DataLoader implements CommandLineRunner {
 
     if (showRepo.count() == 0) {
       showRepo.saveAll(List.of(
-          new ShowPost("º½¸ÂÀÌ °ø¿¬", "¹êµåÀÇ º½¸ÂÀÌ °ø¿¬ ¾È³»", "/uploads/sample-poster.png"),
-          new ShowPost("¿©¸§ Æä½ºÆ¼¹ú", "¾ß¿Ü ¹«´ë", "/uploads/sample-poster.png"),
-          new ShowPost("°¡À» ¼Ò±ØÀå", "°¨¼º °ø¿¬", "/uploads/sample-poster.png")
+          new ShowPost("Spring Concert", "Band spring concert notice", "/uploads/sample-poster.png"),
+          new ShowPost("Summer Festival", "Outdoor stage", "/uploads/sample-poster.png"),
+          new ShowPost("Autumn Small Theater", "Emotional concert", "/uploads/sample-poster.png")
       ));
     }
     if (videoRepo.count() == 0) {
       videoRepo.saveAll(List.of(
-          new Video("¶óÀÌºê 1", "dQw4w9WgXcQ", "Ã¹ ¶óÀÌºê"),
-          new Video("¶óÀÌºê 2", "LXb3EKWsInQ", "µÎ¹øÂ°"),
-          new Video("¶óÀÌºê 3", "3JZ_D3ELwOQ", "¼¼¹øÂ°")
+          new Video("Live 1", "dQw4w9WgXcQ", "First live"),
+          new Video("Live 2", "LXb3EKWsInQ", "Second live"),
+          new Video("Live 3", "3JZ_D3ELwOQ", "Third live")
       ));
     }
     if (eventRepo.count() == 0) {
       ShowPost first = showRepo.findAll().get(0);
       Event e = new Event();
-      e.setTitle("º½¸ÂÀÌ 1È¸Â÷");
+      e.setTitle("ìž‘ì „ëª…;ë¬¸ 4 1íšŒì°¨");
       e.setShowPost(first);
       e.setStartAt(LocalDateTime.now().plusDays(7).toInstant(ZoneOffset.UTC));
-      e.setVenue("È«´ë Å¬·´");
+      e.setVenue("DGT ì•„íŠ¸ì„¼í„°");
       e.setPrice(30000);
-      e.setTotalStock(50);
-      e.setRemainingStock(50);
+      e.setTotalStock(100);
+      e.setRemainingStock(100);
       eventRepo.save(e);
+    } else {
+      Event e = eventRepo.findAll().get(0);
+      if (looksCorrupt(e.getTitle()) || looksCorrupt(e.getVenue())
+          || "Spring Concert Session 1".equals(e.getTitle())
+          || "Hongdae Club".equals(e.getVenue())) {
+        e.setTitle("ìž‘ì „ëª…;ë¬¸ 4 1íšŒì°¨");
+        e.setVenue("DGT ì•„íŠ¸ì„¼í„°");
+        e.setTotalStock(100);
+        if (e.getRemainingStock() > 100) {
+          e.setRemainingStock(100);
+        }
+        eventRepo.save(e);
+      }
     }
+  }
+
+  private boolean looksCorrupt(String s) {
+    if (s == null || s.isBlank()) return true;
+    if (s.contains("ï¿½")) return true;
+    return s.matches(".*[\\u0100-\\u024F\\u1E00-\\u1EFF].*");
   }
 }

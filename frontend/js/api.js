@@ -4,19 +4,19 @@ const authHeaders = () => token() ? { 'Authorization': `Bearer ${token()}` } : {
 
 const MOCK = {
   '/shows': [
-    {id:1,title:'������ ����',content:'����� ������ ���� �ȳ�',posterUrl:'/uploads/sample-poster.png'},
-    {id:2,title:'���� �佺Ƽ��',content:'�߿� ���� �佺Ƽ��',posterUrl:'/uploads/sample-poster.png'},
-    {id:3,title:'���� �ұ���',content:'���� ����',posterUrl:'/uploads/sample-poster.png'}
+    { id: 1, title: '봄맞이 공연', content: '밴드의 봄맞이 공연 안내', posterUrl: '/uploads/sample-poster.png' },
+    { id: 2, title: '여름 페스티벌', content: '야외 무대 페스티벌', posterUrl: '/uploads/sample-poster.png' },
+    { id: 3, title: '가을 소극장', content: '감성 공연', posterUrl: '/uploads/sample-poster.png' }
   ],
   '/videos': [
-    {id:1,title:'���̺� 1',youtubeId:'dQw4w9WgXcQ',description:'ù ���̺�'},
-    {id:2,title:'���̺� 2',youtubeId:'LXb3EKWsInQ',description:'�ι�°'},
-    {id:3,title:'���̺� 3',youtubeId:'3JZ_D3ELwOQ',description:'����°'}
+    { id: 1, title: '라이브 1', youtubeId: 'dQw4w9WgXcQ', description: '첫 라이브' },
+    { id: 2, title: '라이브 2', youtubeId: 'LXb3EKWsInQ', description: '두번째' },
+    { id: 3, title: '라이브 3', youtubeId: '3JZ_D3ELwOQ', description: '세번째' }
   ],
   '/events': [
-    {id:1,title:'������ 1ȸ��',venue:'ȫ�� Ŭ��',price:30000,totalStock:50,remainingStock:50,startAt:new Date(Date.now()+7*86400000).toISOString(),showPost:{id:1}}
+    { id: 1, title: '봄맞이 1회차', venue: '홍대 클럽', price: 30000, totalStock: 50, remainingStock: 50, startAt: new Date(Date.now() + 7 * 86400000).toISOString(), showPost: { id: 1 } }
   ],
-  '/auth/me': { user: { email:'guest@example.com', name:'�Խ�Ʈ', role:'GUEST' } }
+  '/auth/me': { user: { email: 'guest@example.com', name: '게스트', role: 'GUEST' } }
 };
 function mockGet(path){
   if(path.startsWith('/shows/')){
@@ -50,7 +50,7 @@ async function apiPost(path, body) {
     if (!res.ok) throw await res.json();
     return res.json();
   } catch (e) {
-    throw { error: '�鿣�尡 �غ���� �ʾ� �������� �ʽ��ϴ�.' };
+    throw { error: '백엔드가 준비되지 않아 요청을 처리하지 못했어요.' };
   }
 }
 async function apiPut(path, body) {
