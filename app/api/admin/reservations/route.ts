@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+Ôªøexport const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRoleAtLeast, HttpError } from "@/lib/auth-helpers";
@@ -16,7 +16,7 @@ export async function GET() {
         id: r.id,
         status: r.status,
         qty: r.qty,
-        userName: r.user.name || r.user.nickname || "ªÁøÎ¿⁄",
+        userName: r.user.name || r.user.nickname || "ÏÇ¨Ïö©Ïûê",
       })),
     });
   } catch (err: any) {
@@ -25,3 +25,4 @@ export async function GET() {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
+

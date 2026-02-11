@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+﻿export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { CURRENT_SHOW_INFO } from "@/lib/show-info";
@@ -24,3 +24,4 @@ export async function GET() {
     }))
   );
 }
+
