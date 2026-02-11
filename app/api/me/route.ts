@@ -1,4 +1,5 @@
-﻿import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession, HttpError } from "@/lib/auth-helpers";
 import { getTemplateImage } from "@/lib/tickets";

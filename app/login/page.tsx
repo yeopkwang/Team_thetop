@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   clearAuthState,
@@ -19,7 +19,7 @@ type AuthResponse = {
   user: { id: string; name?: string | null; email?: string | null; roles?: string[] };
 };
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -155,5 +155,13 @@ export default function LoginPage() {
         {message && <p className="text-sm text-slate-600">{message}</p>}
       </section>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

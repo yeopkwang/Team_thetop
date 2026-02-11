@@ -1,4 +1,5 @@
-Ôªøimport { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRoleAtLeast, HttpError } from "@/lib/auth-helpers";
 import { RoleType } from "@prisma/client";
@@ -15,7 +16,7 @@ export async function GET() {
         id: r.id,
         status: r.status,
         qty: r.qty,
-        userName: r.user.name || r.user.nickname || "ÏÇ¨Ïö©Ïûê",
+        userName: r.user.name || r.user.nickname || "ªÁøÎ¿⁄",
       })),
     });
   } catch (err: any) {
