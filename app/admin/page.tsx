@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { springFetch } from "@/lib/spring-client";
 
@@ -136,6 +137,17 @@ export default function AdminPage() {
   return (
     <main className="container-base space-y-4">
       <h1 className="text-2xl font-bold">관리자 페이지</h1>
+      <section className="rounded-2xl bg-white p-5 shadow space-y-3">
+        <h2 className="text-lg font-semibold">관리 메뉴</h2>
+        <div className="flex gap-2">
+          <Link href="/admin" className="rounded bg-slate-900 px-3 py-2 text-sm font-semibold text-white">
+            예약 관리
+          </Link>
+          <Link href="/admin/refunds" className="rounded border px-3 py-2 text-sm font-semibold hover:bg-slate-50">
+            환불 관리
+          </Link>
+        </div>
+      </section>
 
       <section className="rounded-2xl bg-white p-5 shadow space-y-3">
         <h2 className="text-lg font-semibold">입금 확인 대기 목록</h2>

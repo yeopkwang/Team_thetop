@@ -3,6 +3,7 @@
 type JsonValue = Record<string, unknown> | unknown[] | string | number | boolean | null;
 
 const API_BASE = "/api";
+const AUTH_PROVIDER_KEY = "auth_provider";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -15,11 +16,24 @@ export function setToken(token: string): void {
   window.dispatchEvent(new Event("storage"));
 }
 
+export function setAuthProvider(provider: "kakao" | "admin"): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(AUTH_PROVIDER_KEY, provider);
+}
+
+export function getAuthProvider(): "kakao" | "admin" | null {
+  if (typeof window === "undefined") return null;
+  const value = window.localStorage.getItem(AUTH_PROVIDER_KEY);
+  if (value === "kakao" || value === "admin") return value;
+  return null;
+}
+
 export function clearAuthState(): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem("token");
   window.localStorage.removeItem("latestTicket");
   window.localStorage.removeItem("hasBooked");
+  window.localStorage.removeItem(AUTH_PROVIDER_KEY);
   window.dispatchEvent(new Event("storage"));
 }
 

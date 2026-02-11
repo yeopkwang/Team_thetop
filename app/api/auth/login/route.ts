@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { createToken } from "@/lib/jwt";
+import { RoleType } from "@prisma/client";
 
 export async function POST(req: Request) {
   try {
@@ -41,6 +42,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "로그인 정보가 올바르지 않습니다." }, { status: 401 });
     }
 
+    const roles = credential.user.roles.map((r) => r.role.type);
+    const isAdmin = roles.includes(RoleType.ADMIN) || roles.includes(RoleType.SUPER_ADMIN);
+    if (!isAdmin) {
+      return NextResponse.json({ error: "일반 사용자는 카카오 로그인만 지원합니다." }, { status: 403 });
+    }
+
     const token = createToken(credential.user.id);
     return NextResponse.json({
       token,
@@ -48,7 +55,7 @@ export async function POST(req: Request) {
         id: credential.user.id,
         name: credential.user.name,
         email: credential.user.email,
-        roles: credential.user.roles.map((r) => r.role.type),
+        roles,
       },
     });
   } catch (error) {

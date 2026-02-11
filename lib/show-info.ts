@@ -17,4 +17,5 @@ export const CURRENT_SHOW_INFO = {
     account: "1002-1212-1618",
     amount: 5000,
   },
+  refundContact: "010-9149-5865",
 } as const;
