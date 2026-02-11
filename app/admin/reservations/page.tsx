@@ -92,7 +92,7 @@ export default function AdminReservationsPage() {
           />
         </div>
 
-        {loading && <p className="text-sm text-slate-500">불러오는 중...</p>}
+        {loading && <p className="text-sm text-slate-500">페이지를 준비하고 있습니다.</p>}
         {!loading && filtered.length === 0 && <p className="text-sm text-slate-500">표시할 예매가 없습니다.</p>}
 
         <div className="grid gap-2">

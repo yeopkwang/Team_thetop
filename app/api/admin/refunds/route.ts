@@ -8,7 +8,7 @@ export async function GET() {
   try {
     await requireRoleAtLeast(RoleType.ADMIN);
     const refunds = await prisma.refund.findMany({
-      include: { reservation: true, account: true },
+      include: { reservation: { include: { user: true } }, account: true },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json({ refunds });
@@ -18,4 +18,3 @@ export async function GET() {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
-

@@ -131,7 +131,7 @@ export default function MyTicketPage() {
     }
   };
 
-  if (loading) return <main className="container-base">불러오는 중...</main>;
+  if (loading) return <main className="container-base">페이지를 준비하고 있습니다. 잠시만 기다려주세요.</main>;
   if (error) return <main className="container-base">오류: {error}</main>;
   if (!payload) return <main className="container-base">예매된 티켓이 없습니다.</main>;
 

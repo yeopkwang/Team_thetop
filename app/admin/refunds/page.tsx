@@ -11,6 +11,7 @@ type RefundItem = {
   createdAt: string;
   reservation?: {
     userId: string;
+    user?: { name?: string | null; email?: string | null };
     status: string;
     qty?: number;
   };
@@ -67,7 +68,7 @@ export default function AdminRefundsPage() {
       {message && <div className="text-sm text-slate-700">{message}</div>}
 
       <div className="grid gap-3">
-        {loading && <div className="text-sm text-slate-500">불러오는 중...</div>}
+        {loading && <div className="text-sm text-slate-500">페이지를 준비하고 있습니다.</div>}
         {!loading && items.length === 0 && <div className="text-sm text-slate-500">환불 요청 내역이 없습니다.</div>}
 
         {items.map((r) => (
@@ -75,6 +76,7 @@ export default function AdminRefundsPage() {
             <div className="font-semibold">환불 ID: {r.id}</div>
             <div className="text-xs text-slate-500">예약 ID: {r.reservationId}</div>
             <div className="text-xs text-slate-500">예약자 ID: {r.reservation?.userId || "-"}</div>
+            <div className="text-xs text-slate-500">예약자 이름: {r.reservation?.user?.name || "-"}</div>
             <div className="text-xs text-slate-500">상태: {r.status}</div>
             <div className="text-xs text-slate-500">요청 시각: {new Date(r.createdAt).toLocaleString("ko-KR")}</div>
 

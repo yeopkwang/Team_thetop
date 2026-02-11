@@ -174,7 +174,7 @@ export default function AdminShowsPage() {
       <section className="space-y-3">
         <h2 className="font-semibold">전체 공연 목록</h2>
         {loading ? (
-          <div className="text-sm text-slate-500">불러오는 중...</div>
+          <div className="text-sm text-slate-500">페이지를 준비하고 있습니다.</div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             {shows.map((show) => (

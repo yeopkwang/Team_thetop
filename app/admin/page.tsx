@@ -203,7 +203,7 @@ export default function AdminPage() {
 
       <section className="rounded-2xl bg-white p-5 shadow space-y-3">
         <h2 className="text-lg font-semibold">입금 확인 대기 목록</h2>
-        {loading && <p className="text-sm text-slate-500">불러오는 중...</p>}
+        {loading && <p className="text-sm text-slate-500">페이지를 준비하고 있습니다.</p>}
         {!loading && list.length === 0 && <p className="text-sm text-slate-500">확인 대기 예약이 없습니다.</p>}
         <div className="grid gap-2">
           {list.map(({ booking }) => (

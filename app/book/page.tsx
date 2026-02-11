@@ -69,7 +69,7 @@ export default function BookPage() {
     }
   };
 
-  if (loading) return <main className="container-base">불러오는 중...</main>;
+  if (loading) return <main className="container-base">페이지를 준비하고 있습니다. 잠시만 기다려주세요.</main>;
   if (error) return <main className="container-base">오류: {error}</main>;
 
   return (
