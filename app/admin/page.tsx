@@ -36,40 +36,13 @@ type Html5QrcodeCtor = {
   getCameras: () => Promise<Array<{ id: string; label: string }>>;
 };
 
-declare global {
-  interface Window {
-    Html5Qrcode?: Html5QrcodeCtor;
-    __html5QrcodeLoading?: Promise<void>;
-  }
-}
-
 const QR_READER_ID = "qr-reader";
-
-const loadScript = (src: string): Promise<void> =>
-  new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = src;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`스크립트 로드 실패: ${src}`));
-    document.body.appendChild(script);
-  });
-
-const loadHtml5QrcodeScript = async (): Promise<void> => {
-  if (window.Html5Qrcode) return;
-  if (!window.__html5QrcodeLoading) {
-    window.__html5QrcodeLoading = (async () => {
-      try {
-        await loadScript("https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js");
-      } catch {
-        await loadScript("https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/minified/html5-qrcode.min.js");
-      }
-      if (!window.Html5Qrcode) {
-        throw new Error("QR 스캐너 라이브러리를 불러오지 못했습니다.");
-      }
-    })();
+let html5QrcodeCtorPromise: Promise<Html5QrcodeCtor> | null = null;
+const loadHtml5QrcodeCtor = async (): Promise<Html5QrcodeCtor> => {
+  if (!html5QrcodeCtorPromise) {
+    html5QrcodeCtorPromise = import("html5-qrcode").then((mod) => mod.Html5Qrcode as unknown as Html5QrcodeCtor);
   }
-  await window.__html5QrcodeLoading;
+  return html5QrcodeCtorPromise;
 };
 
 export default function AdminPage() {
@@ -165,10 +138,9 @@ export default function AdminPage() {
 
     try {
       setMessage("");
-      await loadHtml5QrcodeScript();
-      if (!window.Html5Qrcode) throw new Error("QR 스캐너를 초기화할 수 없습니다.");
+      const Html5Qrcode = await loadHtml5QrcodeCtor();
 
-      const scanner = new window.Html5Qrcode(QR_READER_ID);
+      const scanner = new Html5Qrcode(QR_READER_ID);
       scannerRef.current = scanner;
       setScannerOn(true);
 
@@ -193,7 +165,7 @@ export default function AdminPage() {
           }
         );
       } catch {
-        const cameras = await window.Html5Qrcode.getCameras();
+        const cameras = await Html5Qrcode.getCameras();
         if (!cameras.length) throw new Error("사용 가능한 카메라를 찾지 못했습니다.");
         await scanner.start(
           cameras[0].id,
