@@ -36,6 +36,39 @@ type CheckInResponse = {
   ticket: { id: string; qrToken: string; reservationId: string };
 };
 
+declare global {
+  interface Window {
+    Html5Qrcode?: new (elementId: string) => {
+      start: (
+        cameraConfig: { facingMode: string } | string,
+        config: { fps?: number; qrbox?: { width: number; height: number } },
+        onScanSuccess: (decodedText: string) => void,
+        onScanFailure?: (errorMessage: string) => void
+      ) => Promise<void>;
+      stop: () => Promise<void>;
+      clear: () => Promise<void>;
+    };
+    __html5QrcodeLoading?: Promise<void>;
+  }
+}
+
+const QR_READER_ID = "qr-reader";
+
+const loadHtml5QrcodeScript = async (): Promise<void> => {
+  if (window.Html5Qrcode) return;
+  if (!window.__html5QrcodeLoading) {
+    window.__html5QrcodeLoading = new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js";
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("QR 스캐너 라이브러리를 불러오지 못했습니다."));
+      document.body.appendChild(script);
+    });
+  }
+  await window.__html5QrcodeLoading;
+};
+
 export default function AdminPage() {
   const [list, setList] = useState<PendingBooking[]>([]);
   const [reservations, setReservations] = useState<ReservationItem[]>([]);
@@ -46,9 +79,11 @@ export default function AdminPage() {
   const [scanResult, setScanResult] = useState<CheckInResponse | null>(null);
   const [scannerOn, setScannerOn] = useState(false);
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const timerRef = useRef<number | null>(null);
+  const scannerRef = useRef<{
+    stop: () => Promise<void>;
+    clear: () => Promise<void>;
+  } | null>(null);
+  const scanLockRef = useRef(false);
 
   const loadPending = async () => {
     setLoading(true);
@@ -57,7 +92,7 @@ export default function AdminPage() {
       const data = await springFetch<PendingBooking[]>("/admin/bookings/pending");
       setList(Array.isArray(data) ? data : []);
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "대기 목록을 불러오지 못했습니다.");
+      setMessage(error instanceof Error ? error.message : "예약 목록을 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
@@ -79,8 +114,9 @@ export default function AdminPage() {
     loadPending();
     loadReservations();
     return () => {
-      stopScanner();
+      void stopScanner();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const confirmBooking = async (bookingId: string) => {
@@ -113,56 +149,66 @@ export default function AdminPage() {
     }
   };
 
-  const stopScanner = () => {
+  const stopScanner = async () => {
     setScannerOn(false);
-    if (timerRef.current) {
-      window.clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
+    scanLockRef.current = false;
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+      } catch {
+        // noop
+      }
+      try {
+        await scannerRef.current.clear();
+      } catch {
+        // noop
+      }
+      scannerRef.current = null;
     }
   };
 
   const startScanner = async () => {
-    if (!("BarcodeDetector" in window)) {
-      setMessage("이 브라우저는 카메라 QR 스캔을 지원하지 않습니다. 아래 수동 입력을 사용하세요.");
+    if (scannerOn) return;
+
+    if (!window.isSecureContext) {
+      setMessage("카메라 스캔은 HTTPS(또는 localhost) 환경에서만 동작합니다.");
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMessage("이 브라우저는 카메라 API를 지원하지 않습니다.");
       return;
     }
 
     try {
       setMessage("");
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
+      await loadHtml5QrcodeScript();
+      if (!window.Html5Qrcode) throw new Error("QR 스캐너를 초기화할 수 없습니다.");
+
+      const scanner = new window.Html5Qrcode(QR_READER_ID);
+      scannerRef.current = scanner;
       setScannerOn(true);
 
-      const detector = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
-      timerRef.current = window.setInterval(async () => {
-        if (!videoRef.current || videoRef.current.readyState < 2) return;
-        try {
-          const barcodes = await detector.detect(videoRef.current);
-          if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
-            const raw = String(barcodes[0].rawValue).trim();
-            setScanToken(raw);
-            stopScanner();
-            await processCheckIn(raw);
-          }
-        } catch {
-          // noop
+      await scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 240, height: 240 } },
+        async (decodedText: string) => {
+          if (scanLockRef.current) return;
+          const raw = String(decodedText || "").trim();
+          if (!raw) return;
+
+          scanLockRef.current = true;
+          setScanToken(raw);
+          await stopScanner();
+          await processCheckIn(raw);
+        },
+        () => {
+          // scan miss noop
         }
-      }, 500);
-    } catch {
-      setMessage("카메라를 시작하지 못했습니다. 권한을 확인하세요.");
+      );
+    } catch (error: unknown) {
+      setScannerOn(false);
+      setMessage(error instanceof Error ? error.message : "카메라를 시작하지 못했습니다. 권한을 확인하세요.");
     }
   };
 
@@ -196,7 +242,7 @@ export default function AdminPage() {
               <p className="text-sm text-slate-600">예매 날짜: {new Date(r.createdAt).toLocaleString("ko-KR")}</p>
               <p className="text-sm text-slate-600">예매 상태: {r.status}</p>
               <p className="text-sm text-slate-600">수량: {r.qty}</p>
-              <p className="text-sm text-slate-600">공연명: {r.event?.title || "작전명;문 4"}</p>
+              <p className="text-sm text-slate-600">공연명: {r.event?.title || "작전명 문4"}</p>
               <p className="text-sm text-slate-600">공연 장소: {r.event?.venue || "-"}</p>
               <p className="text-sm text-slate-600">
                 공연 일시: {r.event?.date || "-"} {r.event?.time ? `/ ${r.event.time}` : ""}
@@ -214,7 +260,7 @@ export default function AdminPage() {
           {list.map(({ booking }) => (
             <div key={booking.id} className="flex items-center justify-between gap-3 rounded border p-3">
               <div>
-                <p className="font-semibold">{booking.event?.title || "작전명;문 4"}</p>
+                <p className="font-semibold">{booking.event?.title || "작전명 문4"}</p>
                 <p className="text-sm text-slate-500">예약자: {booking.user?.email || booking.user?.name || "unknown"}</p>
                 <p className="text-sm text-slate-500">구매시간: {new Date(booking.createdAt).toLocaleString("ko-KR")}</p>
               </div>
@@ -242,13 +288,14 @@ export default function AdminPage() {
           </button>
           <button
             type="button"
-            onClick={stopScanner}
+            onClick={() => void stopScanner()}
             className="rounded border px-3 py-2 text-sm font-semibold hover:bg-slate-50"
           >
             스캔 중지
           </button>
         </div>
-        <video ref={videoRef} autoPlay muted playsInline className="w-full max-w-md rounded border bg-black" />
+
+        <div id={QR_READER_ID} className="w-full max-w-md overflow-hidden rounded border bg-black" />
         <p className="text-xs text-slate-500">{scannerOn ? "카메라 스캔 중..." : "카메라 대기 중"}</p>
 
         <div className="flex gap-2">
@@ -270,7 +317,9 @@ export default function AdminPage() {
         {scanResult && (
           <div className="rounded border bg-emerald-50 border-emerald-200 p-3 space-y-1 text-sm">
             <p className="font-semibold text-emerald-800">체크인 완료</p>
-            <p>회원: {scanResult.member.name || "-"} ({scanResult.member.email || "-"})</p>
+            <p>
+              회원: {scanResult.member.name || "-"} ({scanResult.member.email || "-"})
+            </p>
             <p>공연: {scanResult.performance.title}</p>
             <p>장소: {scanResult.performance.venue}</p>
             <p>
