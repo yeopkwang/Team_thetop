@@ -66,7 +66,8 @@ export default function HomePage() {
       <section className="space-y-3 rounded-2xl bg-white p-5 shadow md:p-8">
         <h2 className="text-xl font-bold">공연상세</h2>
         <p className="text-slate-700">
-          작전명;문 4는 2023년을 시작으로 반송고등학교 재학생/졸업생이 함께 모여 만드는 밴드 공연입니다.
+          작전명;문 4는 동탄 반송고등학교 재학생과 졸업생이 함께 만드는 밴드 공연입니다. 2023년 첫 작전명;문을
+          시작으로 4년째 이어져 선후배가 음악으로 교류하는 연례 무대를 만들어 나가고 있습니다.
         </p>
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           예매 후 입금 확인이 완료되면 QR 티켓이 발급됩니다.
