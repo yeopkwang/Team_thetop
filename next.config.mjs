@@ -1,24 +1,15 @@
-ï»¿/** @type {import('next').NextConfig} */
+/** @type {import('"'"'next'"'"').NextConfig} */
 const nextConfig = {
+  // ¼­¹ö ·±Å¸ÀÓÀ» °­Á¦ÇÏ¿© static export¸¦ ¸·À½
+  output: "standalone",
   typescript: {
-    // !! ê²½ê³  !!
-    // í”„ë¡œì íŠ¸ì— íƒ€ì… ì—ëŸ¬ê°€ ìˆì–´ë„ ë¬´ì‹œí•˜ê³  í”„ë¡œë•ì…˜ ë¹Œë“œë¥¼ ì™„ë£Œí•©ë‹ˆë‹¤.
+    // Å¸ÀÔ ¿¡·¯°¡ ÀÖ¾îµµ ÇÁ·Î´ö¼Ç ºôµå¸¦ ÁøÇà
     ignoreBuildErrors: true,
   },
   eslint: {
-    // !! ê²½ê³  !!
-    // í”„ë¡œì íŠ¸ì— ESLint ì—ëŸ¬ê°€ ìˆì–´ë„ ë¬´ì‹œí•˜ê³  ë°°í¬í•©ë‹ˆë‹¤.
+    // ESLint ¿¡·¯°¡ ÀÖ¾îµµ ºôµå ÁøÇà
     ignoreDuringBuilds: true,
   },
 };
+
 export default nextConfig;
-
-
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  output: 'standalone',        // â† ì¶”ê°€
-  typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
-};
-export default nextConfig;
-
