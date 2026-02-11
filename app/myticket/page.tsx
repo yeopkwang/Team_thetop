@@ -55,7 +55,7 @@ export default function MyTicketPage() {
       const related = Array.isArray(tickets) ? tickets.filter((t) => t.booking?.id === latest.id) : [];
       setPayload({ booking: latest, tickets: related });
     } catch (loadError: unknown) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load booking data.");
+      setError(loadError instanceof Error ? loadError.message : "예매 정보를 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
@@ -101,17 +101,17 @@ export default function MyTicketPage() {
     setMessage("");
     try {
       await springFetch(`/bookings/${payload.booking.id}/cancel`, { method: "POST" });
-      setMessage("Booking has been cancelled and seats were restored.");
+      setMessage("예매가 취소되었고 좌석이 복구되었습니다.");
       await load();
     } catch (e: unknown) {
-      setMessage(e instanceof Error ? e.message : "Failed to cancel booking.");
+      setMessage(e instanceof Error ? e.message : "취소 처리에 실패했습니다.");
     }
   };
 
   const requestRefundByTicket = async (ticket: Ticket) => {
     if (!payload) return;
     if (ticket.checkedInAt) {
-      setMessage("Used ticket cannot be refunded.");
+      setMessage("이미 사용(입장 완료)된 티켓은 환불 요청할 수 없습니다.");
       return;
     }
 
@@ -124,57 +124,57 @@ export default function MyTicketPage() {
         method: "POST",
         bodyJson: { reservationId },
       });
-      setMessage(`Refund set to pending. Please contact ${CURRENT_SHOW_INFO.refundContact}.`);
+      setMessage(`환불 대기 상태로 전환되었습니다. ${CURRENT_SHOW_INFO.refundContact} 번호로 카카오톡 보내주세요.`);
       await load();
     } catch (e: unknown) {
-      setMessage(e instanceof Error ? e.message : "Failed to request refund.");
+      setMessage(e instanceof Error ? e.message : "환불 요청에 실패했습니다.");
     }
   };
 
-  if (loading) return <main className="container-base">Loading...</main>;
-  if (error) return <main className="container-base">Error: {error}</main>;
-  if (!payload) return <main className="container-base">No ticket found.</main>;
+  if (loading) return <main className="container-base">불러오는 중...</main>;
+  if (error) return <main className="container-base">오류: {error}</main>;
+  if (!payload) return <main className="container-base">예매된 티켓이 없습니다.</main>;
 
   const title = payload.booking.event?.title || CURRENT_SHOW_INFO.title;
   const createdAt = new Date(payload.booking.createdAt).toLocaleString("ko-KR");
   const selectedRefundTicket = activeTickets.find((t) => t.id === selectedRefundTicketId) || null;
 
   const statusTextMap: Record<string, string> = {
-    PAYMENT_PENDING: "Payment Pending",
-    CONFIRMED: "Confirmed",
-    REFUND_PENDING: "Refund Pending",
-    REFUNDED: "Refunded",
-    CANCELLED: "Cancelled",
+    PAYMENT_PENDING: "예매 대기",
+    CONFIRMED: "예매 완료",
+    REFUND_PENDING: "환불 대기",
+    REFUNDED: "환불 완료",
+    CANCELLED: "예매 취소",
   };
   const statusText = statusTextMap[status || ""] || status || "-";
 
   return (
     <main className="container-base space-y-4">
-      <h1 className="text-2xl font-bold">My Ticket</h1>
+      <h1 className="text-2xl font-bold">내 티켓</h1>
 
       {status === "PAYMENT_PENDING" && (
         <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-2">
-          <p className="font-semibold text-amber-800">Payment pending</p>
+          <p className="font-semibold text-amber-800">예매 대기 상태 (입금 확인 전)</p>
           <p className="text-sm text-amber-900">
             {CURRENT_SHOW_INFO.payment.holder} : {CURRENT_SHOW_INFO.payment.bank} {CURRENT_SHOW_INFO.payment.account}
           </p>
-          <p className="text-sm text-amber-900">Amount: {CURRENT_SHOW_INFO.payment.amount.toLocaleString()} KRW</p>
+          <p className="text-sm text-amber-900">입금 금액: {CURRENT_SHOW_INFO.payment.amount.toLocaleString()}원</p>
           <button
             type="button"
             onClick={() => void cancelPendingBooking()}
             className="rounded bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
           >
-            Cancel booking
+            취소하기
           </button>
         </section>
       )}
 
       {status === "CONFIRMED" && (
         <section className="rounded-xl border border-sky-300 bg-sky-50 p-4 space-y-2">
-          <p className="font-semibold text-sky-800">Booking confirmed</p>
-          <p className="text-sm text-sky-900">Choose one active ticket below, then request refund.</p>
-          {activeTickets.length === 0 && <p className="text-sm text-rose-700">No refundable ticket left.</p>}
-          <p className="text-sm text-sky-900">Selected ticket: {selectedRefundTicket ? selectedRefundTicket.id : "None"}</p>
+          <p className="font-semibold text-sky-800">예매 완료 상태입니다.</p>
+          <p className="text-sm text-sky-900">환불을 원하면 아래 사용 가능한 티켓에서 하나 선택 후 환불 요청을 누르세요.</p>
+          {activeTickets.length === 0 && <p className="text-sm text-rose-700">현재 환불 가능한 티켓이 없습니다.</p>}
+          <p className="text-sm text-sky-900">선택된 티켓: {selectedRefundTicket ? selectedRefundTicket.id : "없음"}</p>
           <button
             type="button"
             disabled={!selectedRefundTicket}
@@ -184,24 +184,24 @@ export default function MyTicketPage() {
             }}
             className="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Request refund for selected ticket
+            선택한 티켓 환불 요청
           </button>
         </section>
       )}
 
       {status === "REFUND_PENDING" && (
         <section className="rounded-xl border border-violet-300 bg-violet-50 p-4">
-          <p className="text-sm text-violet-900">Refund is pending. Please contact {CURRENT_SHOW_INFO.refundContact}.</p>
+          <p className="text-sm text-violet-900">환불 대기 상태입니다. {CURRENT_SHOW_INFO.refundContact} 번호로 카카오톡 보내주세요.</p>
         </section>
       )}
 
       {message && <p className="text-sm text-slate-700">{message}</p>}
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Active Tickets</h2>
+        <h2 className="text-lg font-semibold">사용 가능한 티켓</h2>
         <div className="grid gap-3">
           {activeTickets.length === 0 && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">No active ticket.</div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">사용 가능한 티켓이 없습니다.</div>
           )}
 
           {activeTickets.map((ticket, index) => (
@@ -215,13 +215,13 @@ export default function MyTicketPage() {
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">Ticket</span>
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">내 티켓</span>
                 <span className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">{statusText}</span>
               </div>
               <h2 className="text-lg font-semibold">{title}</h2>
-              <p className="text-sm text-slate-600">Purchased at: {createdAt}</p>
-              <p className="text-sm text-slate-600">Ticket #{index + 1}</p>
-              {isConfirmed && ticket.ticketCode && <p className="text-sm text-slate-700">Click card to open QR</p>}
+              <p className="text-sm text-slate-600">구매시간: {createdAt}</p>
+              <p className="text-sm text-slate-600">티켓 {index + 1}</p>
+              {isConfirmed && ticket.ticketCode && <p className="text-sm text-slate-700">티켓 클릭 시 QR 표시</p>}
 
               {isConfirmed && (
                 <button
@@ -236,7 +236,7 @@ export default function MyTicketPage() {
                       : "border border-slate-300 bg-white text-slate-700"
                   }`}
                 >
-                  {selectedRefundTicketId === ticket.id ? "Selected for refund" : "Select this for refund"}
+                  {selectedRefundTicketId === ticket.id ? "환불 선택됨" : "이 티켓 환불 선택"}
                 </button>
               )}
             </section>
@@ -245,25 +245,25 @@ export default function MyTicketPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Used Tickets</h2>
+        <h2 className="text-lg font-semibold">사용한 티켓</h2>
         <div className="grid gap-3">
           {usedTickets.length === 0 && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">No used ticket.</div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">사용한 티켓이 없습니다.</div>
           )}
 
           {usedTickets.map((ticket, index) => (
             <section key={ticket.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">Ticket</span>
-                <span className="rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700">Used</span>
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">내 티켓</span>
+                <span className="rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700">사용한 티켓</span>
               </div>
               <h2 className="text-lg font-semibold">{title}</h2>
-              <p className="text-sm text-slate-600">Purchased at: {createdAt}</p>
-              <p className="text-sm text-slate-600">Used ticket #{index + 1}</p>
+              <p className="text-sm text-slate-600">구매시간: {createdAt}</p>
+              <p className="text-sm text-slate-600">사용 티켓 {index + 1}</p>
               <p className="text-sm font-semibold text-emerald-700">
-                Checked in: {new Date(ticket.checkedInAt as string).toLocaleString("ko-KR")}
+                입장 완료: {new Date(ticket.checkedInAt as string).toLocaleString("ko-KR")}
               </p>
-              <p className="text-xs text-slate-500">Used tickets are not refundable.</p>
+              <p className="text-xs text-slate-500">사용한 티켓은 환불 요청할 수 없습니다.</p>
             </section>
           ))}
         </div>
@@ -280,10 +280,10 @@ export default function MyTicketPage() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
         >
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-5 text-center shadow-xl space-y-3">
-            <h3 className="text-lg font-semibold">Entry QR</h3>
+            <h3 className="text-lg font-semibold">입장 QR</h3>
             <img
               src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(selectedQr)}`}
-              alt="Entry QR code"
+              alt="입장 QR 코드"
               className="mx-auto rounded border"
             />
             <p className="text-xs break-all text-slate-500">{selectedQr}</p>
@@ -292,7 +292,7 @@ export default function MyTicketPage() {
               onClick={() => setSelectedQr(null)}
               className="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
             >
-              Close
+              닫기
             </button>
           </div>
         </div>
