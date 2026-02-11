@@ -151,16 +151,6 @@ async function main() {
       endDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 119),
       isActive: false,
     },
-    {
-      id: "past-2",
-      title: "여름 콘서트",
-      description: "여름밤을 달군 라이브",
-      coverImage: "https://images.unsplash.com/photo-1511379938547-c1f69419868d",
-      content: "여름 콘서트 포토/영상 모음",
-      startDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 240),
-      endDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 239),
-      isActive: false,
-    },
   ];
   for (const show of pastShows) {
     await prisma.show.upsert({
