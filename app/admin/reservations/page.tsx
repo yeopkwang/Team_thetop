@@ -49,11 +49,10 @@ export default function AdminReservationsPage() {
     return items.filter((r) => {
       const haystack = [
         r.userName,
-        r.userEmail || "",
         r.userId,
         r.event?.title || "",
-        r.event?.venue || "",
         r.status,
+        String(r.qty),
       ]
         .join(" ")
         .toLowerCase();
@@ -88,7 +87,7 @@ export default function AdminReservationsPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="이름, 이메일, 공연명, 상태 검색"
+            placeholder="예매자, 아이디, 공연명, 상태, 수량 검색"
             className="w-full max-w-sm rounded border px-3 py-2 text-sm"
           />
         </div>
@@ -101,15 +100,9 @@ export default function AdminReservationsPage() {
             <div key={r.id} className="rounded border p-3 space-y-1">
               <p className="font-semibold">예매자: {r.userName}</p>
               <p className="text-sm text-slate-600">예매자 ID: {r.userId}</p>
-              <p className="text-sm text-slate-600">이메일: {r.userEmail || "-"}</p>
-              <p className="text-sm text-slate-600">예매 일시: {new Date(r.createdAt).toLocaleString("ko-KR")}</p>
+              <p className="text-sm text-slate-600">공연명: {r.event?.title || "-"}</p>
               <p className="text-sm text-slate-600">상태: {r.status}</p>
               <p className="text-sm text-slate-600">수량: {r.qty}</p>
-              <p className="text-sm text-slate-600">공연명: {r.event?.title || "-"}</p>
-              <p className="text-sm text-slate-600">공연 장소: {r.event?.venue || "-"}</p>
-              <p className="text-sm text-slate-600">
-                공연 일시: {r.event?.date || "-"} {r.event?.time ? `/ ${r.event.time}` : ""}
-              </p>
             </div>
           ))}
         </div>
