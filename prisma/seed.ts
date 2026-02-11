@@ -108,7 +108,11 @@ async function main() {
   // sample show and session
   const sampleShow = await prisma.show.upsert({
     where: { id: "sample-show" },
-    update: {},
+    update: {
+      title: "Sample Show",
+      isActive: true,
+      startDate: new Date(),
+    },
     create: {
       id: "sample-show",
       title: "Sample Show",
@@ -119,7 +123,11 @@ async function main() {
 
   await prisma.showSession.upsert({
     where: { id: "sample-session" },
-    update: {},
+    update: {
+      title: "1회차",
+      date: new Date(Date.now() + 1000 * 60 * 60 * 24),
+      totalCapacity: 100,
+    },
     create: {
       id: "sample-session",
       showId: sampleShow.id,
