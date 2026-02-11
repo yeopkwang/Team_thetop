@@ -13,6 +13,22 @@ type PendingBooking = {
   };
 };
 
+type ReservationItem = {
+  id: string;
+  status: string;
+  qty: number;
+  createdAt: string;
+  userId: string;
+  userName: string;
+  userEmail?: string | null;
+  event?: {
+    title?: string;
+    venue?: string;
+    date?: string;
+    time?: string;
+  };
+};
+
 type CheckInResponse = {
   checkIn: { id: string; createdAt: string };
   member: { id: string; name?: string | null; email?: string | null };
@@ -22,7 +38,9 @@ type CheckInResponse = {
 
 export default function AdminPage() {
   const [list, setList] = useState<PendingBooking[]>([]);
+  const [reservations, setReservations] = useState<ReservationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reservationsLoading, setReservationsLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [scanToken, setScanToken] = useState("");
   const [scanResult, setScanResult] = useState<CheckInResponse | null>(null);
@@ -45,8 +63,21 @@ export default function AdminPage() {
     }
   };
 
+  const loadReservations = async () => {
+    setReservationsLoading(true);
+    try {
+      const data = await springFetch<{ reservations: ReservationItem[] }>("/admin/reservations");
+      setReservations(Array.isArray(data?.reservations) ? data.reservations : []);
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : "전체 예매 목록을 불러오지 못했습니다.");
+    } finally {
+      setReservationsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadPending();
+    loadReservations();
     return () => {
       stopScanner();
     };
@@ -61,6 +92,7 @@ export default function AdminPage() {
       });
       setMessage(`예약 ${bookingId} 승인 완료`);
       await loadPending();
+      await loadReservations();
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : "승인 처리 실패");
     }
@@ -146,6 +178,31 @@ export default function AdminPage() {
           <Link href="/admin/refunds" className="rounded border px-3 py-2 text-sm font-semibold hover:bg-slate-50">
             환불 관리
           </Link>
+        </div>
+      </section>
+
+      <section className="rounded-2xl bg-white p-5 shadow space-y-3">
+        <h2 className="text-lg font-semibold">전체 예매자 목록</h2>
+        {reservationsLoading && <p className="text-sm text-slate-500">불러오는 중...</p>}
+        {!reservationsLoading && reservations.length === 0 && (
+          <p className="text-sm text-slate-500">예매 내역이 없습니다.</p>
+        )}
+        <div className="grid gap-2">
+          {reservations.map((r) => (
+            <div key={r.id} className="rounded border p-3 space-y-1">
+              <p className="font-semibold">예매자: {r.userName}</p>
+              <p className="text-sm text-slate-600">예매자 고유 ID: {r.userId}</p>
+              <p className="text-sm text-slate-600">이메일: {r.userEmail || "-"}</p>
+              <p className="text-sm text-slate-600">예매 날짜: {new Date(r.createdAt).toLocaleString("ko-KR")}</p>
+              <p className="text-sm text-slate-600">예매 상태: {r.status}</p>
+              <p className="text-sm text-slate-600">수량: {r.qty}</p>
+              <p className="text-sm text-slate-600">공연명: {r.event?.title || "작전명;문 4"}</p>
+              <p className="text-sm text-slate-600">공연 장소: {r.event?.venue || "-"}</p>
+              <p className="text-sm text-slate-600">
+                공연 일시: {r.event?.date || "-"} {r.event?.time ? `/ ${r.event.time}` : ""}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 

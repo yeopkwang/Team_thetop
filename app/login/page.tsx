@@ -131,7 +131,7 @@ function LoginPageContent() {
                     value={loginId}
                     onChange={(e) => setLoginId(e.target.value)}
                     className="mt-1 w-full rounded border px-3 py-2"
-                    placeholder="wkrwjs1"
+                    placeholder="관리자 ID"
                   />
                 </label>
                 <label className="block text-sm font-medium">
@@ -141,7 +141,7 @@ function LoginPageContent() {
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     className="mt-1 w-full rounded border px-3 py-2"
-                    placeholder="audans1"
+                    placeholder="비밀번호"
                   />
                 </label>
                 <button type="submit" className="rounded bg-slate-900 px-4 py-2 text-white hover:bg-slate-800">
