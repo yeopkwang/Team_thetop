@@ -1,115 +1,69 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 
-function formatDate(date?: Date | null) {
-  if (!date) return "일정 미정";
-  return new Intl.DateTimeFormat("ko", { month: "short", day: "numeric" }).format(date);
-}
-
-export default async function HomePage() {
-  const shows = await prisma.show.findMany({
-    include: { sessions: true },
-    orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
-  });
-  const now = new Date();
-  const upcoming = shows.filter((s) => s.isActive || (!!s.startDate && s.startDate > now));
-  const past = shows.filter((s) => !s.isActive || (!!s.startDate && s.startDate <= now));
-
+export default function HomePage() {
   return (
-    <main className="container-base space-y-8">
-      <section className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 text-white p-6 md:p-8 shadow-lg">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="space-y-2">
-            <p className="text-sm text-slate-200">작전명문</p>
-            <h1 className="text-3xl md:text-4xl font-bold leading-tight">공연 예매 · 예약 허브</h1>
-            <p className="text-sm text-slate-200">
-              홈에서 지난 공연을 둘러보고, 예매·예약에서 다음 공연을 신청하세요.
+    <main className="container-base space-y-6">
+      <section className="rounded-2xl bg-white shadow p-5 md:p-8">
+        <p className="text-sm font-semibold text-red-700">현재 예매 가능한 공연</p>
+        <h1 className="mt-2 text-3xl font-bold">작전명;문 4</h1>
+        <div className="mt-5 grid gap-6 md:grid-cols-[300px_1fr]">
+          <div className="rounded-xl border bg-slate-50 p-3">
+            <img src="/uploads/sample-poster.png" alt="공연 포스터" className="w-full rounded-lg object-cover" />
+          </div>
+          <div className="space-y-3">
+            <div className="grid grid-cols-[88px_1fr] gap-2 border-b pb-2">
+              <div className="text-slate-500">일시</div>
+              <div>2026년 02월 22일 (일)</div>
+            </div>
+            <div className="grid grid-cols-[88px_1fr] gap-2 border-b pb-2">
+              <div className="text-slate-500">시간</div>
+              <div>
+                <div>18:00 ~ 21:00</div>
+                <div className="text-sm text-slate-500">인터미션 포함 / 입장 가능 17:30</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-[88px_1fr] gap-2 border-b pb-2">
+              <div className="text-slate-500">장소</div>
+              <div>
+                <div>공덕 DGT 아트센터</div>
+                <div className="text-sm text-slate-500">서울특별시 마포구 독막로 308</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-[88px_1fr] gap-2 border-b pb-2">
+              <div className="text-slate-500">문의</div>
+              <div>
+                <div>대표 이건형</div>
+                <div className="text-sm text-slate-500">@band.bansong</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-[88px_1fr] gap-2">
+              <div className="text-slate-500">입장 관련</div>
+              <div>관객 100명 · 전원 스탠딩</div>
+            </div>
+            <p className="pt-2 text-sm text-slate-600">
+              본 공연은 온라인 예매로 진행되며, 예매하신 티켓의 취소/환불 관련 사항은 공연 안내 규정에 따라
+              적용됩니다.
             </p>
-          </div>
-          <div className="flex gap-2">
-            <Link
-              href="/book"
-              className="rounded-full bg-white text-slate-900 px-4 py-2 text-sm font-semibold hover:bg-slate-100"
-            >
-              예매·예약 바로가기
-            </Link>
-            <Link
-              href="/login"
-              className="rounded-full border border-white/40 px-4 py-2 text-sm font-semibold hover:bg-white/10"
-            >
-              로그인
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">예정 공연</h2>
-          <Link href="/book" className="text-sm text-blue-600 hover:text-blue-700">
-            예약하러 가기
-          </Link>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          {upcoming.length === 0 && (
-            <div className="rounded-xl bg-white shadow p-4 text-sm text-slate-500">등록된 예정 공연이 없습니다.</div>
-          )}
-          {upcoming.map((show) => (
-            <div key={show.id} className="rounded-xl bg-white shadow hover:shadow-lg transition p-4 space-y-3">
-              {show.coverImage && (
-                <div className="h-40 rounded-lg overflow-hidden border">
-                  <img src={show.coverImage} alt={show.title} className="w-full h-full object-cover" />
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-slate-900 text-white text-xs px-2 py-1">예정</span>
-                <span className="text-sm text-slate-500">{formatDate(show.startDate)}</span>
-              </div>
-              <div className="text-lg font-semibold">{show.title}</div>
-              <p className="text-sm text-slate-600">{show.description}</p>
-              <div className="flex flex-wrap gap-2">
-                {show.sessions.map((s) => (
-                  <span key={s.id} className="rounded-full border px-3 py-1 text-xs text-slate-700">
-                    {s.title} · {new Date(s.date).toLocaleDateString("ko", { month: "short", day: "numeric" })}
-                  </span>
-                ))}
-              </div>
+            <div className="pt-2">
               <Link
                 href="/book"
-                className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                className="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
               >
-                예약/예매하기
+                예매하기
               </Link>
             </div>
-          ))}
+          </div>
         </div>
       </section>
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">지난 공연</h2>
-          <p className="text-sm text-slate-500">관리자가 게시한 기록</p>
-        </div>
-        <div className="grid gap-3 md:grid-cols-3">
-          {past.length === 0 && (
-            <div className="rounded-xl bg-white shadow p-4 text-sm text-slate-500">지난 공연 기록이 없습니다.</div>
-          )}
-          {past.map((show) => (
-            <div key={show.id} className="rounded-xl bg-white shadow hover:shadow-lg transition p-4 space-y-2">
-              {show.coverImage && (
-                <div className="h-32 rounded-lg overflow-hidden border">
-                  <img src={show.coverImage} alt={show.title} className="w-full h-full object-cover" />
-                </div>
-              )}
-              <div className="flex items-center gap-2 text-xs text-slate-500">
-                <span className="rounded-full bg-slate-100 px-2 py-1">지난 공연</span>
-                <span>{formatDate(show.startDate)}</span>
-              </div>
-              <div className="font-semibold">{show.title}</div>
-              <p className="text-sm text-slate-600">{show.description || "관리자가 등록한 공연 기록"}</p>
-            </div>
-          ))}
-        </div>
+      <section className="rounded-2xl bg-white shadow p-5 md:p-8 space-y-3">
+        <h2 className="text-xl font-bold">공연상세</h2>
+        <p className="text-slate-700">
+          작전명;문 4는 2023년을 시작으로 반송고등학교 재학생/졸업생이 함께 모여 만드는 밴드 공연입니다.
+        </p>
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          예매 후 입금 확인이 완료되면 QR 티켓이 발급됩니다.
+        </p>
       </section>
     </main>
   );

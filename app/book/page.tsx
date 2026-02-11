@@ -1,40 +1,40 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { springFetch } from "@/lib/spring-client";
+import { CURRENT_SHOW_INFO } from "@/lib/show-info";
 
-interface ShowSession {
+type EventItem = {
   id: string;
-  title: string;
-  date: string;
-  totalCapacity: number;
-  soldQty: number;
-}
+  startAt: string;
+  totalStock: number;
+  remainingStock: number;
+};
 
-interface Show {
-  id: string;
-  title: string;
-  description?: string | null;
-  sessions: ShowSession[];
-}
+type BookingResponse = {
+  booking: { id: string };
+  payment?: { holder: string; bank: string; account: string; amount: number };
+};
 
 export default function BookPage() {
-  const [shows, setShows] = useState<Show[]>([]);
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedSession, setSelectedSession] = useState<string | null>(null);
-  const [qty, setQty] = useState(1);
-  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     const load = async () => {
+      setLoading(true);
+      setError("");
       try {
-        const res = await fetch("/api/book/shows");
-        if (!res.ok) throw new Error("Failed to load shows");
-        const data = await res.json();
-        setShows(data.shows || []);
-      } catch (err: any) {
-        setError(err.message);
+        const data = await springFetch<EventItem[]>("/events");
+        const safe = Array.isArray(data) ? data : [];
+        setEvents(safe);
+        if (safe.length > 0) setSelectedSessionId(safe[0].id);
+      } catch (loadError: unknown) {
+        setError(loadError instanceof Error ? loadError.message : "공연 정보를 불러오지 못했습니다.");
       } finally {
         setLoading(false);
       }
@@ -42,20 +42,30 @@ export default function BookPage() {
     load();
   }, []);
 
+  const selectedSession = useMemo(
+    () => events.find((event) => event.id === selectedSessionId) || events[0] || null,
+    [events, selectedSessionId]
+  );
+
   const submit = async () => {
-    setMessage(null);
-    if (!selectedSession) return setMessage("회차를 선택하세요");
+    setMessage("");
+    if (!selectedSessionId) {
+      setMessage("예매 가능한 회차가 없습니다.");
+      return;
+    }
+
     try {
-      const res = await fetch("/api/book/reservations", {
+      const data = await springFetch<BookingResponse>("/bookings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: selectedSession, qty }),
+        bodyJson: { eventId: selectedSessionId, quantity: 1 },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "예약 실패");
-      setMessage(`예약 생성: ${data.reservation.id}. 24시간 내 입금하세요.`);
-    } catch (err: any) {
-      setMessage(err.message);
+      localStorage.setItem("hasBooked", "1");
+      setMessage(
+        `예약 대기 상태입니다. ${CURRENT_SHOW_INFO.payment.holder} : ${CURRENT_SHOW_INFO.payment.bank} ${CURRENT_SHOW_INFO.payment.account} 로 ${CURRENT_SHOW_INFO.payment.amount.toLocaleString()}원 입금 후 관리자 승인까지 기다려주세요. (예약번호: ${data.booking.id})`
+      );
+      window.location.href = "/myticket";
+    } catch (submitError: unknown) {
+      setMessage(submitError instanceof Error ? submitError.message : "예매 요청에 실패했습니다.");
     }
   };
 
@@ -64,63 +74,81 @@ export default function BookPage() {
 
   return (
     <main className="container-base space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        <div>
-          <p className="text-sm text-slate-500">예매 · 예약</p>
-          <h1 className="text-2xl font-bold">공연 예약하기</h1>
-          <p className="text-sm text-slate-600">관리자가 올린 회차를 선택하고 예약을 진행하세요.</p>
-        </div>
-        <Link
-          href="/mypage"
-          className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-        >
-          내 예약 확인
-        </Link>
-      </div>
-      <div className="grid gap-4">
-        {shows.map((show) => (
-          <div key={show.id} className="rounded-lg bg-white shadow p-4 space-y-2">
-            <div className="font-semibold text-lg">{show.title}</div>
-            <p className="text-sm text-slate-600">{show.description}</p>
-            <div className="grid gap-2">
-              {show.sessions.map((s) => {
-                const remaining = s.totalCapacity - s.soldQty;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setSelectedSession(s.id)}
-                    className={`flex justify-between rounded border p-2 text-left ${
-                      selectedSession === s.id ? "border-primary" : "border-slate-200"
-                    }`}
-                  >
-                    <div>
-                      <div className="font-semibold">{s.title}</div>
-                      <div className="text-xs text-slate-500">{new Date(s.date).toLocaleString()}</div>
-                    </div>
-                    <div className="text-sm">잔여 {remaining}</div>
-                  </button>
-                );
-              })}
-            </div>
+      <section className="rounded-2xl bg-white shadow p-5 md:p-8">
+        <p className="text-sm font-semibold text-red-700">현재 예매 가능한 공연</p>
+        <h1 className="mt-2 text-3xl font-bold">{CURRENT_SHOW_INFO.title}</h1>
+        <div className="mt-5 grid gap-6 md:grid-cols-[300px_1fr]">
+          <div className="rounded-xl border bg-slate-50 p-3">
+            <img src={CURRENT_SHOW_INFO.posterUrl} alt="공연 포스터" className="w-full rounded-lg object-cover" />
           </div>
-        ))}
-      </div>
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-        <input
-          type="number"
-          min={1}
-          value={qty}
-          onChange={(e) => setQty(Number(e.target.value))}
-          className="border rounded px-3 py-2 w-28"
-        />
+          <div className="space-y-3">
+            <div className="grid grid-cols-[88px_1fr] gap-2 border-b pb-2">
+              <div className="text-slate-500">일시</div>
+              <div>{CURRENT_SHOW_INFO.dateLabel}</div>
+            </div>
+            <div className="grid grid-cols-[88px_1fr] gap-2 border-b pb-2">
+              <div className="text-slate-500">시간</div>
+              <div>
+                <div>{CURRENT_SHOW_INFO.timeLabel}</div>
+                <div className="text-sm text-slate-500">{CURRENT_SHOW_INFO.timeSubLabel}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-[88px_1fr] gap-2 border-b pb-2">
+              <div className="text-slate-500">장소</div>
+              <div>
+                <div>{CURRENT_SHOW_INFO.venue}</div>
+                <div className="text-sm text-slate-500">{CURRENT_SHOW_INFO.venueAddress}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-[88px_1fr] gap-2 border-b pb-2">
+              <div className="text-slate-500">문의</div>
+              <div>
+                <div>{CURRENT_SHOW_INFO.contactName}</div>
+                <div className="text-sm text-slate-500">{CURRENT_SHOW_INFO.contactTag}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-[88px_1fr] gap-2">
+              <div className="text-slate-500">입장 관련</div>
+              <div>{CURRENT_SHOW_INFO.audienceInfo}</div>
+            </div>
+            <p className="pt-2 text-sm text-slate-600">{CURRENT_SHOW_INFO.notice}</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl bg-white shadow p-5 md:p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">예매하기</h2>
+          <Link
+            href="/myticket"
+            className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+          >
+            내 티켓 확인
+          </Link>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-sm text-slate-600">1인 1매만 예매 가능합니다.</p>
+          {selectedSession ? (
+            <div className="rounded border p-3 text-sm text-slate-700">
+              잔여 좌석: {Math.max(0, selectedSession.remainingStock)} / {selectedSession.totalStock}
+            </div>
+          ) : (
+            <div className="rounded border p-3 text-sm text-slate-700">예매 가능한 회차가 없습니다.</div>
+          )}
+        </div>
+
         <button
+          type="button"
           onClick={submit}
-          className="px-4 py-2 bg-primary text-white rounded hover:bg-slate-800"
+          disabled={!selectedSession}
+          className="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
         >
-          예약 생성
+          예매하기
         </button>
-      </div>
-      {message && <div className="text-sm text-primary">{message}</div>}
+
+        {message && <p className="text-sm text-slate-700">{message}</p>}
+      </section>
     </main>
   );
 }

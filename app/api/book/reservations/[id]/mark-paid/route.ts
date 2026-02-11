@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { HttpError, requireSession } from "@/lib/auth-helpers";
 import { ReservationStatus } from "@prisma/client";
@@ -10,7 +10,10 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
     const reservation = await prisma.reservation.findUnique({ where: { id: params.id } });
     if (!reservation) throw new HttpError(404, "예약 없음");
     if (reservation.userId !== session.user.id) throw new HttpError(403, "권한 없음");
-    if (![ReservationStatus.REQUESTED, ReservationStatus.PAYMENT_PENDING].includes(reservation.status)) {
+    if (
+      reservation.status !== ReservationStatus.REQUESTED &&
+      reservation.status !== ReservationStatus.PAYMENT_PENDING
+    ) {
       throw new HttpError(400, "표시할 수 없는 상태");
     }
 

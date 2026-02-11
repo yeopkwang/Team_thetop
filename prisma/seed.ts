@@ -16,6 +16,7 @@ async function main() {
   }
 
   const userRole = await prisma.role.findUnique({ where: { type: RoleType.USER } });
+  const adminRole = await prisma.role.findUnique({ where: { type: RoleType.ADMIN } });
   const superRole = await prisma.role.findUnique({ where: { type: RoleType.SUPER_ADMIN } });
 
   // seed super admin user
@@ -55,6 +56,53 @@ async function main() {
       update: {},
       create: { userId: testUser.id, roleId: userRole.id },
     });
+  }
+
+  // predefined admin credential users
+  const initialAdmins = [
+    { username: "wkrwjs1", password: "audans1" },
+    { username: "wkrwjs2", password: "audans2" },
+    { username: "wkrwjs3", password: "audans3" },
+    { username: "wkrwjs4", password: "audans4" },
+    { username: "wkrwjs5", password: "audans5" },
+    { username: "wkrwjs6", password: "audans6" },
+  ];
+  for (const [index, admin] of initialAdmins.entries()) {
+    const adminUser = await prisma.user.upsert({
+      where: { email: `${admin.username}@admin.local` },
+      update: { name: `ADMIN ${index + 1}`, nickname: admin.username },
+      create: {
+        email: `${admin.username}@admin.local`,
+        name: `ADMIN ${index + 1}`,
+        nickname: admin.username,
+      },
+    });
+
+    const passwordHash = await bcrypt.hash(admin.password, 10);
+    await prisma.credential.upsert({
+      where: { username: admin.username },
+      update: { passwordHash, userId: adminUser.id },
+      create: {
+        username: admin.username,
+        passwordHash,
+        userId: adminUser.id,
+      },
+    });
+
+    if (userRole) {
+      await prisma.userRole.upsert({
+        where: { userId_roleId_isActive: { userId: adminUser.id, roleId: userRole.id, isActive: true } },
+        update: {},
+        create: { userId: adminUser.id, roleId: userRole.id },
+      });
+    }
+    if (adminRole) {
+      await prisma.userRole.upsert({
+        where: { userId_roleId_isActive: { userId: adminUser.id, roleId: adminRole.id, isActive: true } },
+        update: {},
+        create: { userId: adminUser.id, roleId: adminRole.id },
+      });
+    }
   }
 
   // sample show and session

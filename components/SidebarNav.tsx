@@ -2,26 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { getToken, springFetch } from "@/lib/spring-client";
 
 type NavItem = {
   href: string;
   label: string;
-  icon: string;
 };
 
-const navItems: NavItem[] = [
-  { href: "/", label: "홈", icon: "🏠" },
-  { href: "/book", label: "예매·예약", icon: "🎫" },
-  { href: "/admin", label: "관리", icon: "🛠️" },
-];
+type MeResponse = {
+  user?: {
+    roles?: string[];
+  };
+};
 
 function Item({ item, variant }: { item: NavItem; variant?: "mobile" | "desktop" }) {
   const pathname = usePathname();
   const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
   const base =
     variant === "mobile"
-      ? "flex items-center justify-center gap-2 rounded-full border px-3 py-2 text-sm"
-      : "flex items-center gap-3 rounded-lg px-3 py-2 text-sm";
+      ? "flex items-center justify-center rounded-full border px-3 py-2 text-sm"
+      : "flex items-center rounded-lg px-3 py-2 text-sm";
   const activeClass =
     variant === "mobile"
       ? "bg-slate-900 text-white border-slate-900"
@@ -33,15 +34,52 @@ function Item({ item, variant }: { item: NavItem; variant?: "mobile" | "desktop"
 
   return (
     <Link href={item.href} className={`${base} ${active ? activeClass : inactiveClass}`}>
-      <span className="text-base" aria-hidden>
-        {item.icon}
-      </span>
       <span>{item.label}</span>
     </Link>
   );
 }
 
 export default function SidebarNav() {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      if (!getToken()) {
+        if (mounted) setIsAdmin(false);
+        return;
+      }
+
+      try {
+        const me = await springFetch<MeResponse>("/auth/me");
+        const roles = me?.user?.roles || [];
+        if (mounted) setIsAdmin(roles.includes("ADMIN") || roles.includes("SUPER_ADMIN"));
+      } catch {
+        if (mounted) setIsAdmin(false);
+      }
+    };
+
+    load();
+    const onStorage = () => load();
+    window.addEventListener("storage", onStorage);
+    return () => {
+      mounted = false;
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  const navItems: NavItem[] = [
+    { href: "/myticket", label: "마이 티켓" },
+    { href: "/", label: "공연 안내" },
+    { href: "/login", label: "로그인 / 회원가입" },
+    { href: "/book", label: "예매하기" },
+  ];
+
+  if (isAdmin) {
+    navItems.push({ href: "/admin", label: "관리자 페이지" });
+  }
+
   return (
     <>
       <nav className="hidden md:flex flex-col gap-1">
@@ -49,7 +87,7 @@ export default function SidebarNav() {
           <Item key={item.href} item={item} />
         ))}
       </nav>
-      <nav className="md:hidden grid grid-cols-3 gap-2 px-1 pb-3">
+      <nav className="md:hidden grid grid-cols-2 gap-2 px-1 pb-3">
         {navItems.map((item) => (
           <Item key={item.href} item={item} variant="mobile" />
         ))}

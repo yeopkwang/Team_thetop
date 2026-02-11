@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { HttpError, requireSession } from "@/lib/auth-helpers";
 import { RefundStatus, ReservationStatus } from "@prisma/client";
@@ -14,7 +14,10 @@ export async function POST(req: Request) {
     const reservation = await prisma.reservation.findUnique({ where: { id: reservationId }, include: { refund: true } });
     if (!reservation) throw new HttpError(404, "예약 없음");
     if (reservation.userId !== session.user.id) throw new HttpError(403, "권한 없음");
-    if (![ReservationStatus.CONFIRMED, ReservationStatus.PAYMENT_PENDING].includes(reservation.status)) {
+    if (
+      reservation.status !== ReservationStatus.CONFIRMED &&
+      reservation.status !== ReservationStatus.PAYMENT_PENDING
+    ) {
       throw new HttpError(400, "환불 요청 불가 상태");
     }
 

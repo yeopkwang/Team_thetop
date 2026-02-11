@@ -1,6 +1,7 @@
 import { RoleType } from "@prisma/client";
-import { auth } from "./auth";
+import { headers } from "next/headers";
 import { prisma } from "./prisma";
+import { verifyToken } from "./jwt";
 
 export class HttpError extends Error {
   status: number;
@@ -10,54 +11,53 @@ export class HttpError extends Error {
   }
 }
 
-// 로그인 없이도 접근 가능하도록 게스트 세션을 반환한다.
 export async function requireSession() {
-  const session = await auth();
-  if (session && session.user) return session;
+  const authHeader = headers().get("authorization") || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";
+  if (!token) throw new HttpError(401, "로그인이 필요합니다.");
 
-  const guest = await prisma.user.upsert({
-    where: { email: "guest@example.com" },
-    update: {},
-    create: { email: "guest@example.com", name: "GUEST USER", nickname: "guest" },
+  const payload = verifyToken(token);
+  if (!payload?.userId) throw new HttpError(401, "인증이 만료되었습니다.");
+
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+    include: {
+      roles: {
+        where: {
+          isActive: true,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+        include: { role: true },
+      },
+    },
   });
 
-  const rolesToAssign = [RoleType.USER, RoleType.SUPER_ADMIN];
-  for (const type of rolesToAssign) {
-    const role = await prisma.role.findUnique({ where: { type } });
-    if (role) {
-      await prisma.userRole.upsert({
-        where: { userId_roleId_isActive: { userId: guest.id, roleId: role.id, isActive: true } },
-        update: {},
-        create: { userId: guest.id, roleId: role.id },
-      });
-    }
-  }
+  if (!user) throw new HttpError(401, "사용자를 찾을 수 없습니다.");
 
   return {
     user: {
-      id: guest.id,
-      name: guest.name,
-      email: guest.email,
-      kakaoId: guest.kakaoId,
-      roles: rolesToAssign,
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      roles: user.roles.map((r) => r.role.type),
     },
-  } as any;
+  };
 }
 
-export function assertRole(session: any, allowed: RoleType[]) {
-  const roles: RoleType[] = (session?.user?.roles as RoleType[]) || [];
+export function assertRole(session: { user?: { roles?: RoleType[] } }, allowed: RoleType[]) {
+  const roles: RoleType[] = session?.user?.roles || [];
   const ok = roles.some((r) => allowed.includes(r));
-  if (!ok) throw new HttpError(403, "권한이 없습니다");
+  if (!ok) throw new HttpError(403, "권한이 없습니다.");
 }
 
-export function assertRoleOrHigher(session: any, minimum: RoleType) {
+export function assertRoleOrHigher(session: { user?: { roles?: RoleType[] } }, minimum: RoleType) {
   const order = [RoleType.USER, RoleType.STAFF, RoleType.ADMIN, RoleType.SUPER_ADMIN];
-  const roles: RoleType[] = (session?.user?.roles as RoleType[]) || [];
+  const roles: RoleType[] = session?.user?.roles || [];
   const max = roles.reduce((acc, cur) => {
     const idx = order.indexOf(cur);
     return idx > acc ? idx : acc;
   }, -1);
-  if (max < order.indexOf(minimum)) throw new HttpError(403, "권한이 없습니다");
+  if (max < order.indexOf(minimum)) throw new HttpError(403, "권한이 없습니다.");
 }
 
 export async function requireRole(allowed: RoleType[]) {
