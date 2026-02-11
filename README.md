@@ -21,7 +21,7 @@ Next.js 14 App Router 기반 공연/티켓 예약 및 운영 대시보드. Prism
 - `DATABASE_URL` : Postgres 연결 문자열
 - `NEXTAUTH_SECRET` : NextAuth 암호화 키
 - `NEXTAUTH_URL` : 예) http://localhost:3000
-- `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET`
+- `KAKAO_CLIENT_ID`, `_CLIENT_SECRET`
 - `SUPER_ADMIN_KAKAO_ID` : 시드 및 로그인 매칭용
 - `PUBLIC_PAYMENT_ACCOUNT` : 안내용 계좌 문자열
 
