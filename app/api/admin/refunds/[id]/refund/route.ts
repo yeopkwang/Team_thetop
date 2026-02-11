@@ -12,6 +12,7 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
       include: { reservation: { include: { ticket: true } }, account: true },
     });
     if (!refund) throw new HttpError(404, "환불 없음");
+    if (refund.status === RefundStatus.REFUNDED) throw new HttpError(409, "이미 환불 완료된 건입니다.");
 
     const result = await prisma.$transaction(async (tx) => {
       await tx.refund.update({ where: { id: refund.id }, data: { status: RefundStatus.REFUNDED } });

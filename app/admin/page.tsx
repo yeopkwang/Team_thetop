@@ -227,7 +227,6 @@ export default function AdminPage() {
 
       <section className="rounded-2xl bg-white p-5 shadow space-y-3">
         <h2 className="text-lg font-semibold">QR 체크인</h2>
-        <p className="text-xs text-slate-500">안내: HTTPS(또는 localhost) 환경 + 카메라 권한 허용이 필요합니다.</p>
 
         <div className="flex gap-2">
           <button
