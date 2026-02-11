@@ -38,8 +38,11 @@ function LoginPageContent() {
   };
 
   useEffect(() => {
-    refreshMe();
-  }, []);
+    const hasKakaoToken = !!searchParams.get("kakaoToken");
+    if (!hasKakaoToken) {
+      void refreshMe();
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const kakaoToken = searchParams.get("kakaoToken");
@@ -53,7 +56,6 @@ function LoginPageContent() {
       setToken(kakaoToken);
       setAuthProvider("kakao");
       setMessage("카카오 로그인 성공");
-      refreshMe();
       router.replace("/login");
     }
   }, [router, searchParams]);
