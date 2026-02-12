@@ -119,6 +119,12 @@ export default function BookPage() {
                 <div className="text-sm text-slate-500">{CURRENT_SHOW_INFO.contactTag}</div>
               </div>
             </div>
+            <div className="grid grid-cols-[88px_1fr] gap-2 border-b pb-2">
+              <div className="text-slate-500">입금 계좌</div>
+              <div className="font-semibold">
+                {CURRENT_SHOW_INFO.payment.bank} {CURRENT_SHOW_INFO.payment.account} ({CURRENT_SHOW_INFO.payment.holder})
+              </div>
+            </div>
             <div className="grid grid-cols-[88px_1fr] gap-2">
               <div className="text-slate-500">입장 관련</div>
               <div>{CURRENT_SHOW_INFO.audienceInfo}</div>

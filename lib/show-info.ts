@@ -15,7 +15,7 @@ export const CURRENT_SHOW_INFO = {
     holder: "정시윤",
     bank: "토스뱅크",
     account: "1002-1212-1618",
-    amount: 5000,
+    amount: 7000,
   },
-  refundContact: "010-9149-5865",
+  refundContact: "010-2185-7438",
 } as const;
