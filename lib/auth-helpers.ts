@@ -41,20 +41,34 @@ export async function requireSession() {
 }
 
 export async function requireSessionWithRoles() {
-  const session = await requireSession();
-  const roles = await prisma.userRole.findMany({
-    where: {
-      userId: session.user.id,
-      isActive: true,
-      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+  const userId = await getUserIdFromAuthHeader();
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      roles: {
+        where: {
+          isActive: true,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+        select: {
+          role: {
+            select: { type: true },
+          },
+        },
+      },
     },
-    include: { role: true },
   });
+  if (!user) throw new HttpError(401, "?ъ슜?먮? 李얠쓣 ???놁뒿?덈떎.");
 
   return {
     user: {
-      ...session.user,
-      roles: roles.map((r) => r.role.type),
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      roles: user.roles.map((r) => r.role.type),
     },
   };
 }

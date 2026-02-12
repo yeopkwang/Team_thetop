@@ -167,6 +167,7 @@ model Reservation {
   refund Refund?
 
   @@index([userId, createdAt])
+  @@index([createdAt, id])
 }
 
 model Ticket {
