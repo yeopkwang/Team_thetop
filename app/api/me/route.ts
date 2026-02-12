@@ -1,13 +1,13 @@
-﻿export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession, HttpError } from "@/lib/auth-helpers";
+import { requireSessionWithRoles, HttpError } from "@/lib/auth-helpers";
 import { getTemplateImage } from "@/lib/tickets";
 import { ReservationStatus, TicketStatus } from "@prisma/client";
 
 export async function GET() {
   try {
-    const session = await requireSession();
+    const session = await requireSessionWithRoles();
     const roles = (session.user.roles as string[]) || [];
 
     const reservations = await prisma.reservation.findMany({

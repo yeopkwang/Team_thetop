@@ -16,6 +16,9 @@ type MeResponse = {
   };
 };
 
+const ADMIN_ROLE_CACHE_KEY = "admin_role_cache_v1";
+const ADMIN_ROLE_CACHE_TTL_MS = 60 * 1000;
+
 function Item({ item, variant }: { item: NavItem; variant?: "mobile" | "desktop" }) {
   const pathname = usePathname();
   const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -51,11 +54,30 @@ export default function SidebarNav() {
         return;
       }
 
+      const cached = window.localStorage.getItem(ADMIN_ROLE_CACHE_KEY);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached) as { isAdmin: boolean; expiresAt: number };
+          if (parsed.expiresAt > Date.now()) {
+            if (mounted) setIsAdmin(Boolean(parsed.isAdmin));
+            return;
+          }
+        } catch {
+          // ignore invalid cache
+        }
+      }
+
       try {
         const me = await springFetch<MeResponse>("/auth/me");
         const roles = me?.user?.roles || [];
-        if (mounted) setIsAdmin(roles.includes("ADMIN") || roles.includes("SUPER_ADMIN"));
+        const nextIsAdmin = roles.includes("ADMIN") || roles.includes("SUPER_ADMIN");
+        window.localStorage.setItem(
+          ADMIN_ROLE_CACHE_KEY,
+          JSON.stringify({ isAdmin: nextIsAdmin, expiresAt: Date.now() + ADMIN_ROLE_CACHE_TTL_MS })
+        );
+        if (mounted) setIsAdmin(nextIsAdmin);
       } catch {
+        window.localStorage.removeItem(ADMIN_ROLE_CACHE_KEY);
         if (mounted) setIsAdmin(false);
       }
     };

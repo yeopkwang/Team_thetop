@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { springFetch } from "@/lib/spring-client";
@@ -44,16 +44,15 @@ export default function MyTicketPage() {
     setLoading(true);
     setError("");
     try {
-      const bookings = await springFetch<Booking[]>("/my/bookings");
-      if (!Array.isArray(bookings) || bookings.length === 0) {
+      const data = await springFetch<{ booking: Booking | null; tickets: Ticket[] }>("/my/ticket-dashboard");
+      if (!data?.booking) {
         setPayload(null);
         return;
       }
-
-      const latest = [...bookings].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0];
-      const tickets = await springFetch<Ticket[]>("/my/tickets");
-      const related = Array.isArray(tickets) ? tickets.filter((t) => t.booking?.id === latest.id) : [];
-      setPayload({ booking: latest, tickets: related });
+      setPayload({
+        booking: data.booking,
+        tickets: Array.isArray(data.tickets) ? data.tickets : [],
+      });
     } catch (loadError: unknown) {
       setError(loadError instanceof Error ? loadError.message : "예매 정보를 불러오지 못했습니다.");
     } finally {

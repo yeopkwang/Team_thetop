@@ -33,6 +33,7 @@ export function clearAuthState(): void {
   window.localStorage.removeItem("token");
   window.localStorage.removeItem("latestTicket");
   window.localStorage.removeItem("hasBooked");
+  window.localStorage.removeItem("admin_role_cache_v1");
   window.localStorage.removeItem(AUTH_PROVIDER_KEY);
   window.dispatchEvent(new Event("storage"));
 }

@@ -11,7 +11,7 @@ export class HttpError extends Error {
   }
 }
 
-export async function requireSession() {
+async function getUserIdFromAuthHeader() {
   const authHeader = headers().get("authorization") || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";
   if (!token) throw new HttpError(401, "로그인이 필요합니다.");
@@ -19,17 +19,14 @@ export async function requireSession() {
   const payload = verifyToken(token);
   if (!payload?.userId) throw new HttpError(401, "인증이 만료되었습니다.");
 
+  return payload.userId;
+}
+
+export async function requireSession() {
+  const userId = await getUserIdFromAuthHeader();
   const user = await prisma.user.findUnique({
-    where: { id: payload.userId },
-    include: {
-      roles: {
-        where: {
-          isActive: true,
-          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-        },
-        include: { role: true },
-      },
-    },
+    where: { id: userId },
+    select: { id: true, name: true, email: true },
   });
 
   if (!user) throw new HttpError(401, "사용자를 찾을 수 없습니다.");
@@ -39,7 +36,25 @@ export async function requireSession() {
       id: user.id,
       name: user.name,
       email: user.email,
-      roles: user.roles.map((r) => r.role.type),
+    },
+  };
+}
+
+export async function requireSessionWithRoles() {
+  const session = await requireSession();
+  const roles = await prisma.userRole.findMany({
+    where: {
+      userId: session.user.id,
+      isActive: true,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
+    include: { role: true },
+  });
+
+  return {
+    user: {
+      ...session.user,
+      roles: roles.map((r) => r.role.type),
     },
   };
 }
@@ -61,13 +76,13 @@ export function assertRoleOrHigher(session: { user?: { roles?: RoleType[] } }, m
 }
 
 export async function requireRole(allowed: RoleType[]) {
-  const session = await requireSession();
+  const session = await requireSessionWithRoles();
   assertRole(session, allowed);
   return session;
 }
 
 export async function requireRoleAtLeast(minimum: RoleType) {
-  const session = await requireSession();
+  const session = await requireSessionWithRoles();
   assertRoleOrHigher(session, minimum);
   return session;
 }

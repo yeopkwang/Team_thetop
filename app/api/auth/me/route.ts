@@ -1,10 +1,10 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
-import { requireSession, HttpError } from "@/lib/auth-helpers";
+import { requireSessionWithRoles, HttpError } from "@/lib/auth-helpers";
 
 export async function GET() {
   try {
-    const session = await requireSession();
+    const session = await requireSessionWithRoles();
     return NextResponse.json({ user: session.user });
   } catch (error) {
     if (error instanceof HttpError) {

@@ -98,6 +98,7 @@ model UserRole {
   role Role @relation(fields: [roleId], references: [id])
 
   @@unique([userId, roleId, isActive])
+  @@index([userId, isActive, expiresAt])
 }
 
 model RoleRequest {
@@ -164,6 +165,8 @@ model Reservation {
   session ShowSession @relation(fields: [sessionId], references: [id])
   ticket Ticket?
   refund Refund?
+
+  @@index([userId, createdAt])
 }
 
 model Ticket {
@@ -175,6 +178,8 @@ model Ticket {
 
   reservation Reservation @relation(fields: [reservationId], references: [id])
   checkIn     CheckIn?
+
+  @@index([reservationId, status, createdAt])
 }
 
 model CheckIn {
