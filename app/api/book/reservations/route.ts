@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { HttpError, requireSession } from "@/lib/auth-helpers";
 import { ReservationStatus } from "@prisma/client";
@@ -10,7 +10,12 @@ export async function POST(req: Request) {
     const body = await req.json();
     const sessionId = String(body?.sessionId || "");
     const qty = Number(body?.qty || 0);
+    const preferredPerformerName = String(body?.preferredPerformerName || "").trim();
+
     if (!sessionId || !qty || qty <= 0) throw new HttpError(400, "잘못된 요청");
+    if (!preferredPerformerName) {
+      throw new HttpError(400, "관심 있는 공연자 성함을 입력해 주세요. 없다면 '없음'을 입력해 주세요.");
+    }
     if (qty !== 1) throw new HttpError(400, "1인 1매만 예매할 수 있습니다.");
 
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -40,6 +45,7 @@ export async function POST(req: Request) {
           userId: session.user.id,
           sessionId,
           qty,
+          preferredPerformerName,
           status: ReservationStatus.REQUESTED,
           expiresAt,
         },
@@ -49,7 +55,7 @@ export async function POST(req: Request) {
         entityType: "Reservation",
         entityId: created.id,
         actorUserId: session.user.id,
-        after: { status: created.status, qty, sessionId },
+        after: { status: created.status, qty, sessionId, preferredPerformerName },
       });
       return created;
     });

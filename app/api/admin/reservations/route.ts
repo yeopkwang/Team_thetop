@@ -19,6 +19,7 @@ export async function GET() {
         id: r.id,
         status: r.status,
         qty: r.qty,
+        preferredPerformerName: r.preferredPerformerName,
         createdAt: r.createdAt,
         userId: r.user.id,
         userName: r.user.name || r.user.nickname || "사용자",

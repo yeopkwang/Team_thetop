@@ -10,9 +10,13 @@ export async function POST(req: Request) {
     const body = await req.json();
     const sessionId = String(body?.eventId || "");
     const quantity = Number(body?.quantity || 0);
+    const preferredPerformerName = String(body?.preferredPerformerName || "").trim();
 
     if (!sessionId || !quantity || quantity < 1) {
       throw new HttpError(400, "잘못된 요청입니다.");
+    }
+    if (!preferredPerformerName) {
+      throw new HttpError(400, "관심 있는 공연자 성함을 입력해 주세요. 없다면 '없음'을 입력해 주세요.");
     }
     if (quantity !== 1) {
       throw new HttpError(400, "1인 1매만 예매할 수 있습니다.");
@@ -22,7 +26,7 @@ export async function POST(req: Request) {
 
     const booking = await prisma.$transaction(async (tx) => {
       const showSession = await tx.showSession.findUnique({ where: { id: sessionId } });
-      if (!showSession) throw new HttpError(404, "회차를 찾을 수 없습니다.");
+      if (!showSession) throw new HttpError(404, "해당 회차를 찾을 수 없습니다.");
 
       const alreadyBooked = await tx.reservation.findFirst({
         where: {
@@ -51,6 +55,7 @@ export async function POST(req: Request) {
           userId: session.user.id,
           sessionId,
           qty: quantity,
+          preferredPerformerName,
           status: ReservationStatus.PAYMENT_PENDING,
           expiresAt,
         },
@@ -66,6 +71,7 @@ export async function POST(req: Request) {
         status: booking.status,
         createdAt: booking.createdAt,
         quantity: booking.qty,
+        preferredPerformerName: booking.preferredPerformerName,
         event: {
           id: booking.session.id,
           title: CURRENT_SHOW_INFO.title,

@@ -149,6 +149,7 @@ model Reservation {
   userId    String
   sessionId String
   qty       Int
+  preferredPerformerName String @default("없음")
   status    ReservationStatus  @default(REQUESTED)
   paymentMarkedAt DateTime?
   expiresAt DateTime

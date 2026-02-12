@@ -8,6 +8,7 @@ type ReservationItem = {
   id: string;
   status: string;
   qty: number;
+  preferredPerformerName: string;
   createdAt: string;
   userId: string;
   userName: string;
@@ -50,6 +51,7 @@ export default function AdminReservationsPage() {
       const haystack = [
         r.userName,
         r.userId,
+        r.preferredPerformerName,
         r.event?.title || "",
         r.status,
         String(r.qty),
@@ -87,7 +89,7 @@ export default function AdminReservationsPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="예매자, 아이디, 공연명, 상태, 수량 검색"
+            placeholder="예매자, 관심 공연자, 아이디, 공연명, 상태, 수량 검색"
             className="w-full max-w-sm rounded border px-3 py-2 text-sm"
           />
         </div>
@@ -99,6 +101,7 @@ export default function AdminReservationsPage() {
           {filtered.map((r) => (
             <div key={r.id} className="rounded border p-3 space-y-1">
               <p className="font-semibold">예매자: {r.userName}</p>
+              <p className="text-sm text-slate-600">관심 공연자: {r.preferredPerformerName}</p>
               <p className="text-sm text-slate-600">예매자 ID: {r.userId}</p>
               <p className="text-sm text-slate-600">공연명: {r.event?.title || "-"}</p>
               <p className="text-sm text-slate-600">상태: {r.status}</p>

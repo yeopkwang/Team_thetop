@@ -26,6 +26,7 @@ export async function GET() {
           status: booking.status,
           createdAt: booking.createdAt,
           quantity: booking.qty,
+          preferredPerformerName: booking.preferredPerformerName,
           user: {
             email: booking.user.email,
             name: booking.user.name,

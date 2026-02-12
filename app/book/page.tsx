@@ -20,6 +20,7 @@ type BookingResponse = {
 export default function BookPage() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [preferredPerformerName, setPreferredPerformerName] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -39,7 +40,7 @@ export default function BookPage() {
         setLoading(false);
       }
     };
-    load();
+    void load();
   }, []);
 
   const selectedSession = useMemo(
@@ -47,21 +48,32 @@ export default function BookPage() {
     [events, selectedSessionId]
   );
 
+  const trimmedPreferredPerformerName = preferredPerformerName.trim();
+  const canSubmit = Boolean(selectedSession && trimmedPreferredPerformerName);
+
   const submit = async () => {
     setMessage("");
     if (!selectedSessionId) {
       setMessage("예매 가능한 회차가 없습니다.");
       return;
     }
+    if (!trimmedPreferredPerformerName) {
+      setMessage("관심 있는 공연자 성함을 입력해 주세요. 없다면 '없음'을 입력해 주세요.");
+      return;
+    }
 
     try {
       const data = await springFetch<BookingResponse>("/bookings", {
         method: "POST",
-        bodyJson: { eventId: selectedSessionId, quantity: 1 },
+        bodyJson: {
+          eventId: selectedSessionId,
+          quantity: 1,
+          preferredPerformerName: trimmedPreferredPerformerName,
+        },
       });
       localStorage.setItem("hasBooked", "1");
       setMessage(
-        `예약 대기 상태입니다. ${CURRENT_SHOW_INFO.payment.holder} : ${CURRENT_SHOW_INFO.payment.bank} ${CURRENT_SHOW_INFO.payment.account} 로 ${CURRENT_SHOW_INFO.payment.amount.toLocaleString()}원 입금 후 관리자 승인까지 기다려주세요. (예약번호: ${data.booking.id})`
+        `예약 대기 상태입니다. ${CURRENT_SHOW_INFO.payment.holder} : ${CURRENT_SHOW_INFO.payment.bank} ${CURRENT_SHOW_INFO.payment.account} 로 ${CURRENT_SHOW_INFO.payment.amount.toLocaleString()}원 입금 후 관리자의 확인을 기다려주세요. (예약번호: ${data.booking.id})`
       );
       window.location.href = "/myticket";
     } catch (submitError: unknown) {
@@ -74,7 +86,7 @@ export default function BookPage() {
 
   return (
     <main className="container-base space-y-6">
-      <section className="rounded-2xl bg-white shadow p-5 md:p-8">
+      <section className="rounded-2xl bg-white p-5 shadow md:p-8">
         <p className="text-sm font-semibold text-red-700">현재 예매 가능한 공연</p>
         <h1 className="mt-2 text-3xl font-bold">{CURRENT_SHOW_INFO.title}</h1>
         <div className="mt-5 grid gap-6 md:grid-cols-[300px_1fr]">
@@ -116,7 +128,7 @@ export default function BookPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl bg-white shadow p-5 md:p-6 space-y-4">
+      <section className="space-y-4 rounded-2xl bg-white p-5 shadow md:p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">예매하기</h2>
           <Link
@@ -138,11 +150,25 @@ export default function BookPage() {
           )}
         </div>
 
+        <div className="space-y-2">
+          <label htmlFor="preferredPerformerName" className="text-sm font-medium text-slate-800">
+            관심 있는 공연자 성함을 입력해 주세요. 없다면 '없음'을 입력해 주세요.
+          </label>
+          <input
+            id="preferredPerformerName"
+            type="text"
+            value={preferredPerformerName}
+            onChange={(e) => setPreferredPerformerName(e.target.value)}
+            placeholder="예: 홍길동 또는 없음"
+            className="w-full rounded border px-3 py-2 text-sm"
+          />
+        </div>
+
         <button
           type="button"
           onClick={submit}
-          disabled={!selectedSession}
-          className="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+          disabled={!canSubmit}
+          className="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           예매하기
         </button>
