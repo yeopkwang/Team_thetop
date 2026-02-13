@@ -24,6 +24,7 @@ export default function BookPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -52,6 +53,11 @@ export default function BookPage() {
   const canSubmit = Boolean(selectedSession && trimmedPreferredPerformerName);
 
   const submit = async () => {
+    if (isSubmitting) {
+      setMessage("예매가 진행중입니다. 잠시만 기다려주세요.");
+      return;
+    }
+
     setMessage("");
     if (!selectedSessionId) {
       setMessage("예매 가능한 회차가 없습니다.");
@@ -62,8 +68,11 @@ export default function BookPage() {
       return;
     }
 
+    setIsSubmitting(true);
+    setMessage("예매가 진행중입니다. 잠시만 기다려주세요.");
+
     try {
-      const data = await springFetch<BookingResponse>("/bookings", {
+      await springFetch<BookingResponse>("/bookings", {
         method: "POST",
         bodyJson: {
           eventId: selectedSessionId,
@@ -72,12 +81,11 @@ export default function BookPage() {
         },
       });
       localStorage.setItem("hasBooked", "1");
-      setMessage(
-        `예약 대기 상태입니다. ${CURRENT_SHOW_INFO.payment.holder} : ${CURRENT_SHOW_INFO.payment.bank} ${CURRENT_SHOW_INFO.payment.account} 로 ${CURRENT_SHOW_INFO.payment.amount.toLocaleString()}원 입금 후 관리자의 확인을 기다려주세요. (예약번호: ${data.booking.id})`
-      );
       window.location.href = "/myticket";
     } catch (submitError: unknown) {
       setMessage(submitError instanceof Error ? submitError.message : "예매 요청에 실패했습니다.");
+      } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -173,10 +181,10 @@ export default function BookPage() {
         <button
           type="button"
           onClick={submit}
-          disabled={!canSubmit}
+          disabled={!canSubmit || isSubmitting}
           className="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          예매하기
+          {isSubmitting ? "예매 진행중..." : "예매하기"}
         </button>
 
         {message && <p className="text-sm text-slate-700">{message}</p>}
