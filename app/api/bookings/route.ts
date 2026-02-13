@@ -4,6 +4,12 @@ import { HttpError, requireSession } from "@/lib/auth-helpers";
 import { ReservationStatus } from "@prisma/client";
 import { CURRENT_SHOW_INFO } from "@/lib/show-info";
 
+const ACTIVE_RESERVATION_STATUSES = [
+  ReservationStatus.REQUESTED,
+  ReservationStatus.PAYMENT_PENDING,
+  ReservationStatus.CONFIRMED,
+] as const;
+
 export async function POST(req: Request) {
   try {
     const session = await requireSession();
@@ -41,14 +47,36 @@ export async function POST(req: Request) {
         throw new HttpError(400, "이미 예매한 회차입니다. 1인 1매만 가능합니다.");
       }
 
-      if (showSession.soldQty + quantity > showSession.totalCapacity) {
-        throw new HttpError(400, "잔여 수량이 부족합니다.");
+      const reserved = await tx.reservation.aggregate({
+        where: {
+          sessionId,
+          status: { in: ACTIVE_RESERVATION_STATUSES as unknown as ReservationStatus[] },
+        },
+        _sum: { qty: true },
+      });
+      const expectedSoldQty = reserved._sum.qty || 0;
+
+      if (showSession.soldQty !== expectedSoldQty) {
+        await tx.showSession.update({
+          where: { id: sessionId },
+          data: { soldQty: expectedSoldQty },
+        });
       }
 
-      await tx.showSession.update({
-        where: { id: sessionId },
-        data: { soldQty: showSession.soldQty + quantity },
+      const updated = await tx.showSession.updateMany({
+        where: {
+          id: sessionId,
+          soldQty: {
+            lte: showSession.totalCapacity - quantity,
+          },
+        },
+        data: {
+          soldQty: { increment: quantity },
+        },
       });
+      if (updated.count === 0) {
+        throw new HttpError(400, "잔여 수량이 부족합니다.");
+      }
 
       return tx.reservation.create({
         data: {

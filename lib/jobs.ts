@@ -1,11 +1,14 @@
-﻿import { ReservationStatus } from "@prisma/client";
+import { ReservationStatus } from "@prisma/client";
 import { prisma } from "./prisma";
 import { logAudit } from "./audit";
 
 export async function expireReservations(actorUserId?: string) {
   const now = new Date();
   const targets = await prisma.reservation.findMany({
-    where: { status: ReservationStatus.REQUESTED, expiresAt: { lt: now } },
+    where: {
+      status: { in: [ReservationStatus.REQUESTED, ReservationStatus.PAYMENT_PENDING] },
+      expiresAt: { lt: now },
+    },
   });
 
   for (const reservation of targets) {
