@@ -12,6 +12,8 @@ import java.util.List;
 
 @Component
 public class DataLoader implements CommandLineRunner {
+  private static final int TARGET_TOTAL_STOCK = 106;
+
   private final UserRepository userRepo;
   private final ShowPostRepository showRepo;
   private final VideoRepository videoRepo;
@@ -68,20 +70,32 @@ public class DataLoader implements CommandLineRunner {
       e.setStartAt(LocalDateTime.now().plusDays(7).toInstant(ZoneOffset.UTC));
       e.setVenue("DGT 아트센터");
       e.setPrice(30000);
-      e.setTotalStock(100);
-      e.setRemainingStock(100);
+      e.setTotalStock(TARGET_TOTAL_STOCK);
+      e.setRemainingStock(TARGET_TOTAL_STOCK);
       eventRepo.save(e);
     } else {
       Event e = eventRepo.findAll().get(0);
+      boolean changed = false;
       if (looksCorrupt(e.getTitle()) || looksCorrupt(e.getVenue())
           || "Spring Concert Session 1".equals(e.getTitle())
           || "Hongdae Club".equals(e.getVenue())) {
         e.setTitle("작전명;문 4 1회차");
         e.setVenue("DGT 아트센터");
-        e.setTotalStock(100);
-        if (e.getRemainingStock() > 100) {
-          e.setRemainingStock(100);
-        }
+        changed = true;
+      }
+
+      if (e.getTotalStock() != TARGET_TOTAL_STOCK) {
+        int sold = Math.max(0, e.getTotalStock() - e.getRemainingStock());
+        int adjustedRemaining = Math.max(0, TARGET_TOTAL_STOCK - sold);
+        e.setTotalStock(TARGET_TOTAL_STOCK);
+        e.setRemainingStock(adjustedRemaining);
+        changed = true;
+      } else if (e.getRemainingStock() > e.getTotalStock()) {
+        e.setRemainingStock(e.getTotalStock());
+        changed = true;
+      }
+
+      if (changed) {
         eventRepo.save(e);
       }
     }

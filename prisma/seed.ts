@@ -126,14 +126,14 @@ async function main() {
     update: {
       title: "1회차",
       date: new Date(Date.now() + 1000 * 60 * 60 * 24),
-      totalCapacity: 100,
+      totalCapacity: 106,
     },
     create: {
       id: "sample-session",
       showId: sampleShow.id,
       title: "1회차",
       date: new Date(Date.now() + 1000 * 60 * 60 * 24),
-      totalCapacity: 100,
+      totalCapacity: 106,
     },
   });
 
