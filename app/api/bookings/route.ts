@@ -1,0 +1,119 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { HttpError, requireSession } from "@/lib/auth-helpers";
+import { ReservationStatus } from "@prisma/client";
+import { CURRENT_SHOW_INFO } from "@/lib/show-info";
+
+const ACTIVE_RESERVATION_STATUSES = [
+  ReservationStatus.REQUESTED,
+  ReservationStatus.PAYMENT_PENDING,
+  ReservationStatus.CONFIRMED,
+] as const;
+
+export async function POST(req: Request) {
+  try {
+    const session = await requireSession();
+    const body = await req.json();
+    const sessionId = String(body?.eventId || "");
+    const quantity = Number(body?.quantity || 0);
+    const preferredPerformerName = String(body?.preferredPerformerName || "").trim();
+
+    if (!sessionId || !quantity || quantity < 1) {
+      throw new HttpError(400, "잘못된 요청입니다.");
+    }
+    if (!preferredPerformerName) {
+      throw new HttpError(400, "관심 있는 공연자 성함을 입력해 주세요. 없다면 '없음'을 입력해 주세요.");
+    }
+    if (quantity !== 1) {
+      throw new HttpError(400, "1인 1매만 예매할 수 있습니다.");
+    }
+
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const booking = await prisma.$transaction(async (tx) => {
+      const showSession = await tx.showSession.findUnique({ where: { id: sessionId } });
+      if (!showSession) throw new HttpError(404, "해당 회차를 찾을 수 없습니다.");
+
+      const alreadyBooked = await tx.reservation.findFirst({
+        where: {
+          userId: session.user.id,
+          sessionId,
+          status: {
+            notIn: [ReservationStatus.CANCELLED, ReservationStatus.EXPIRED, ReservationStatus.REFUNDED],
+          },
+        },
+      });
+      if (alreadyBooked) {
+        throw new HttpError(400, "이미 예매한 회차입니다. 1인 1매만 가능합니다.");
+      }
+
+      const reserved = await tx.reservation.aggregate({
+        where: {
+          sessionId,
+          status: { in: ACTIVE_RESERVATION_STATUSES as unknown as ReservationStatus[] },
+        },
+        _sum: { qty: true },
+      });
+      const expectedSoldQty = reserved._sum.qty || 0;
+
+      if (showSession.soldQty !== expectedSoldQty) {
+        await tx.showSession.update({
+          where: { id: sessionId },
+          data: { soldQty: expectedSoldQty },
+        });
+      }
+
+      const updated = await tx.showSession.updateMany({
+        where: {
+          id: sessionId,
+          soldQty: {
+            lte: showSession.totalCapacity - quantity,
+          },
+        },
+        data: {
+          soldQty: { increment: quantity },
+        },
+      });
+      if (updated.count === 0) {
+        throw new HttpError(400, "잔여 수량이 부족합니다.");
+      }
+
+      return tx.reservation.create({
+        data: {
+          userId: session.user.id,
+          sessionId,
+          qty: quantity,
+          preferredPerformerName,
+          status: ReservationStatus.PAYMENT_PENDING,
+          expiresAt,
+        },
+        include: {
+          session: { include: { show: true } },
+        },
+      });
+    });
+
+    return NextResponse.json({
+      booking: {
+        id: booking.id,
+        status: booking.status,
+        createdAt: booking.createdAt,
+        quantity: booking.qty,
+        preferredPerformerName: booking.preferredPerformerName,
+        event: {
+          id: booking.session.id,
+          title: CURRENT_SHOW_INFO.title,
+          venue: CURRENT_SHOW_INFO.venue,
+        },
+      },
+      tickets: [],
+      payment: CURRENT_SHOW_INFO.payment,
+    });
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    console.error(error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}

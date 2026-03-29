@@ -1,0 +1,13 @@
+﻿<!DOCTYPE html><html><head><meta charset="UTF-8"><title>영상</title><link rel="stylesheet" href="styles.css"></head><body>
+<header><div class="logo">영상</div><nav class="nav"><a href="/">홈</a></nav></header>
+<main style="padding:24px;"><div class="grid" id="videos"></div></main><div id="modal" style="display:none;"></div>
+<script src="js/api.js"></script>
+<script>
+(async()=>{ const v=await apiGet('/videos'); const c=document.getElementById('videos');
+  v.forEach(item=>{ const d=document.createElement('div'); d.className='card'; d.innerHTML=`<h3>${item.title}</h3><p>${item.description||''}</p><button class="btn">재생</button>`;
+    d.querySelector('button').onclick=()=>open(item.youtubeId); c.appendChild(d); });
+})();
+function open(id){ const m=document.getElementById('modal'); m.innerHTML=`<div class="modal" onclick="closeModal(event)"><iframe src="https://www.youtube.com/embed/${id}?autoplay=1" allowfullscreen></iframe></div>`; m.style.display='block'; }
+function closeModal(e){ if(e.target.classList.contains('modal')){ const m=document.getElementById('modal'); m.innerHTML=''; m.style.display='none'; } }
+</script></body></html>
+
