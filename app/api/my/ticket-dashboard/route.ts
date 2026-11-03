@@ -1,30 +1,39 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { HttpError, requireSession } from "@/lib/auth-helpers";
-import { CURRENT_SHOW_INFO } from "@/lib/show-info";
 import { TicketStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { requireSession } from "@/lib/auth-helpers";
+import { errorResponse } from "@/lib/http";
+import { getCurrentShow } from "@/lib/show";
 
 export async function GET() {
   try {
     const session = await requireSession();
+    const show = await getCurrentShow();
+    if (!show) return NextResponse.json({ booking: null, tickets: [], show: null });
 
+    // 지난 공연의 예매가 아니라, 지금 공연에서 가장 최근에 한 예매를 보여준다.
     const latestBooking = await prisma.reservation.findFirst({
-      where: { userId: session.user.id },
-      include: { session: { include: { show: true } } },
+      where: { userId: session.user.id, session: { showId: show.id } },
       orderBy: { createdAt: "desc" },
     });
 
+    const showInfo = {
+      title: show.title,
+      price: show.price,
+      paymentBank: show.paymentBank,
+      paymentAccount: show.paymentAccount,
+      paymentHolder: show.paymentHolder,
+      refundContact: show.refundContact,
+    };
+
     if (!latestBooking) {
-      return NextResponse.json({ booking: null, tickets: [] });
+      return NextResponse.json({ booking: null, tickets: [], show: showInfo });
     }
 
     const tickets = await prisma.ticket.findMany({
-      where: {
-        status: TicketStatus.ACTIVE,
-        reservationId: latestBooking.id,
-      },
+      where: { status: TicketStatus.ACTIVE, reservationId: latestBooking.id },
       include: { checkIn: true },
       orderBy: { createdAt: "desc" },
     });
@@ -35,11 +44,6 @@ export async function GET() {
         status: latestBooking.status,
         createdAt: latestBooking.createdAt,
         quantity: latestBooking.qty,
-        event: {
-          id: latestBooking.session.id,
-          title: CURRENT_SHOW_INFO.title,
-          venue: CURRENT_SHOW_INFO.venue,
-        },
       },
       tickets: tickets.map((ticket) => ({
         id: ticket.id,
@@ -47,12 +51,9 @@ export async function GET() {
         checkedInAt: ticket.checkIn?.createdAt || null,
         booking: { id: latestBooking.id },
       })),
+      show: showInfo,
     });
   } catch (error) {
-    if (error instanceof HttpError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    console.error(error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return errorResponse(error);
   }
 }

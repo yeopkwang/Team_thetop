@@ -1,53 +1,36 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { HttpError, requireSession } from "@/lib/auth-helpers";
 import { ReservationStatus, TicketStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { requireSession } from "@/lib/auth-helpers";
+import { HttpError, errorResponse } from "@/lib/http";
 
 export async function POST(_: Request, { params }: { params: { id: string } }) {
   try {
     const session = await requireSession();
-    const reservationId = params.id;
 
     const reservation = await prisma.reservation.findUnique({
-      where: { id: reservationId },
-      include: { ticket: true },
+      where: { id: params.id },
+      select: { id: true, userId: true },
     });
     if (!reservation) throw new HttpError(404, "예약이 없습니다.");
     if (reservation.userId !== session.user.id) throw new HttpError(403, "권한이 없습니다.");
-    if (reservation.status !== ReservationStatus.PAYMENT_PENDING) {
-      throw new HttpError(400, "예매 대기 상태에서만 취소할 수 있습니다.");
-    }
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const sessionRow = await tx.showSession.findUnique({ where: { id: reservation.sessionId } });
-      if (!sessionRow) throw new HttpError(404, "회차를 찾을 수 없습니다.");
-
-      await tx.showSession.update({
-        where: { id: sessionRow.id },
-        data: { soldQty: Math.max(0, sessionRow.soldQty - reservation.qty) },
-      });
-
-      const saved = await tx.reservation.update({
-        where: { id: reservation.id },
+    await prisma.$transaction(async (tx) => {
+      // 상태 조건을 걸고 바꿔서, 그사이 관리자가 승인한 예매는 취소되지 않게 한다.
+      const cancelled = await tx.reservation.updateMany({
+        where: { id: reservation.id, status: ReservationStatus.PAYMENT_PENDING },
         data: { status: ReservationStatus.CANCELLED },
       });
+      if (cancelled.count === 0) throw new HttpError(400, "예매 대기 상태에서만 취소할 수 있습니다.");
 
-      if (reservation.ticket) {
-        await tx.ticket.update({
-          where: { id: reservation.ticket.id },
-          data: { status: TicketStatus.REVOKED },
-        });
-      }
-
-      return saved;
+      await tx.ticket.updateMany({
+        where: { reservationId: reservation.id },
+        data: { status: TicketStatus.REVOKED },
+      });
     });
 
-    return NextResponse.json({ reservation: updated });
+    return NextResponse.json({ reservation: { id: reservation.id, status: ReservationStatus.CANCELLED } });
   } catch (error) {
-    if (error instanceof HttpError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    console.error(error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return errorResponse(error);
   }
 }

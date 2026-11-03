@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { HttpError, requireSession } from "@/lib/auth-helpers";
 import { ReservationStatus } from "@prisma/client";
-import { CURRENT_SHOW_INFO } from "@/lib/show-info";
-
-const ACTIVE_RESERVATION_STATUSES = [
-  ReservationStatus.REQUESTED,
-  ReservationStatus.PAYMENT_PENDING,
-  ReservationStatus.CONFIRMED,
-] as const;
+import { prisma } from "@/lib/prisma";
+import { requireSession } from "@/lib/auth-helpers";
+import { HttpError, errorResponse } from "@/lib/http";
+import { CLOSED_STATUSES, SEAT_HOLDING_STATUSES } from "@/lib/reservations";
 
 export async function POST(req: Request) {
   try {
@@ -31,50 +26,31 @@ export async function POST(req: Request) {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const booking = await prisma.$transaction(async (tx) => {
-      const showSession = await tx.showSession.findUnique({ where: { id: sessionId } });
-      if (!showSession) throw new HttpError(404, "해당 회차를 찾을 수 없습니다.");
+      // 같은 회차 예매를 한 줄로 세운다. 잠그지 않으면 동시에 들어온 요청이
+      // 둘 다 잔여석·1인 1매 검사를 통과해서 정원을 넘기거나 한 사람이 두 장을 갖게 된다.
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "ShowSession" WHERE id = ${sessionId} FOR UPDATE`;
+      if (locked.length === 0) throw new HttpError(404, "해당 회차를 찾을 수 없습니다.");
+
+      const showSession = await tx.showSession.findUniqueOrThrow({
+        where: { id: sessionId },
+        include: { show: { select: { isActive: true } } },
+      });
+      if (!showSession.show.isActive) throw new HttpError(400, "지금 예매 중인 공연이 아닙니다.");
 
       const alreadyBooked = await tx.reservation.findFirst({
-        where: {
-          userId: session.user.id,
-          sessionId,
-          status: {
-            notIn: [ReservationStatus.CANCELLED, ReservationStatus.EXPIRED, ReservationStatus.REFUNDED],
-          },
-        },
+        where: { userId: session.user.id, sessionId, status: { notIn: CLOSED_STATUSES } },
+        select: { id: true },
       });
       if (alreadyBooked) {
         throw new HttpError(400, "이미 예매한 회차입니다. 1인 1매만 가능합니다.");
       }
 
       const reserved = await tx.reservation.aggregate({
-        where: {
-          sessionId,
-          status: { in: ACTIVE_RESERVATION_STATUSES as unknown as ReservationStatus[] },
-        },
+        where: { sessionId, status: { in: SEAT_HOLDING_STATUSES } },
         _sum: { qty: true },
       });
-      const expectedSoldQty = reserved._sum.qty || 0;
-
-      if (showSession.soldQty !== expectedSoldQty) {
-        await tx.showSession.update({
-          where: { id: sessionId },
-          data: { soldQty: expectedSoldQty },
-        });
-      }
-
-      const updated = await tx.showSession.updateMany({
-        where: {
-          id: sessionId,
-          soldQty: {
-            lte: showSession.totalCapacity - quantity,
-          },
-        },
-        data: {
-          soldQty: { increment: quantity },
-        },
-      });
-      if (updated.count === 0) {
+      if ((reserved._sum.qty || 0) + quantity > showSession.totalCapacity) {
         throw new HttpError(400, "잔여 수량이 부족합니다.");
       }
 
@@ -87,33 +63,13 @@ export async function POST(req: Request) {
           status: ReservationStatus.PAYMENT_PENDING,
           expiresAt,
         },
-        include: {
-          session: { include: { show: true } },
-        },
       });
     });
 
     return NextResponse.json({
-      booking: {
-        id: booking.id,
-        status: booking.status,
-        createdAt: booking.createdAt,
-        quantity: booking.qty,
-        preferredPerformerName: booking.preferredPerformerName,
-        event: {
-          id: booking.session.id,
-          title: CURRENT_SHOW_INFO.title,
-          venue: CURRENT_SHOW_INFO.venue,
-        },
-      },
-      tickets: [],
-      payment: CURRENT_SHOW_INFO.payment,
+      booking: { id: booking.id, status: booking.status, createdAt: booking.createdAt },
     });
   } catch (error) {
-    if (error instanceof HttpError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    console.error(error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return errorResponse(error);
   }
 }

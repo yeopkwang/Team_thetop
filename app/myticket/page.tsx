@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import QRCode from "qrcode";
 import { apiFetch } from "@/lib/api-client";
-import { CURRENT_SHOW_INFO } from "@/lib/show-info";
 
 type BookingStatus =
   | "PAYMENT_PENDING"
@@ -17,7 +17,15 @@ type Booking = {
   status: BookingStatus;
   createdAt: string;
   quantity: number;
-  event?: { title?: string; venue?: string };
+};
+
+type ShowSummary = {
+  title: string;
+  price: number;
+  paymentBank: string;
+  paymentAccount: string;
+  paymentHolder: string;
+  refundContact: string;
 };
 
 type Ticket = {
@@ -30,6 +38,7 @@ type Ticket = {
 type TicketPayload = {
   booking: Booking;
   tickets: Ticket[];
+  show: ShowSummary;
 };
 
 export default function MyTicketPage() {
@@ -38,20 +47,24 @@ export default function MyTicketPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [selectedQr, setSelectedQr] = useState<string | null>(null);
+  const [qrImage, setQrImage] = useState("");
   const [selectedRefundTicketId, setSelectedRefundTicketId] = useState("");
 
   const load = async () => {
     setLoading(true);
     setError("");
     try {
-      const data = await apiFetch<{ booking: Booking | null; tickets: Ticket[] }>("/my/ticket-dashboard");
-      if (!data?.booking) {
+      const data = await apiFetch<{ booking: Booking | null; tickets: Ticket[]; show: ShowSummary | null }>(
+        "/my/ticket-dashboard"
+      );
+      if (!data?.booking || !data.show) {
         setPayload(null);
         return;
       }
       setPayload({
         booking: data.booking,
         tickets: Array.isArray(data.tickets) ? data.tickets : [],
+        show: data.show,
       });
     } catch (loadError: unknown) {
       setError(loadError instanceof Error ? loadError.message : "예매 정보를 불러오지 못했습니다.");
@@ -63,6 +76,25 @@ export default function MyTicketPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  // QR은 브라우저에서 그린다. 외부 QR 서비스에 넘기면 입장 토큰이 남의 서버에 남는다.
+  useEffect(() => {
+    if (!selectedQr) {
+      setQrImage("");
+      return;
+    }
+    let cancelled = false;
+    QRCode.toDataURL(selectedQr, { width: 260, margin: 1 })
+      .then((url) => {
+        if (!cancelled) setQrImage(url);
+      })
+      .catch(() => {
+        if (!cancelled) setMessage("QR 코드를 만들지 못했습니다.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedQr]);
 
   const tickets = useMemo(() => {
     if (!payload) return [];
@@ -123,7 +155,7 @@ export default function MyTicketPage() {
         method: "POST",
         bodyJson: { reservationId },
       });
-      setMessage(`환불 대기 상태로 전환되었습니다. ${CURRENT_SHOW_INFO.refundContact} 번호로 카카오톡 보내주세요.`);
+      setMessage(`환불 대기 상태로 전환되었습니다. ${payload.show.refundContact} 번호로 카카오톡 보내주세요.`);
       await load();
     } catch (e: unknown) {
       setMessage(e instanceof Error ? e.message : "환불 요청에 실패했습니다.");
@@ -134,7 +166,8 @@ export default function MyTicketPage() {
   if (error) return <main className="container-base">오류: {error}</main>;
   if (!payload) return <main className="container-base">예매된 티켓이 없습니다.</main>;
 
-  const title = payload.booking.event?.title || CURRENT_SHOW_INFO.title;
+  const { show } = payload;
+  const title = show.title;
   const createdAt = new Date(payload.booking.createdAt).toLocaleString("ko-KR");
   const selectedRefundTicket = activeTickets.find((t) => t.id === selectedRefundTicketId) || null;
 
@@ -155,9 +188,9 @@ export default function MyTicketPage() {
         <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-2">
           <p className="font-semibold text-amber-800">예매 대기 상태 (입금 확인 전)</p>
           <p className="text-sm text-amber-900">
-            {CURRENT_SHOW_INFO.payment.holder} : {CURRENT_SHOW_INFO.payment.bank} {CURRENT_SHOW_INFO.payment.account}
+            {show.paymentHolder} : {show.paymentBank} {show.paymentAccount}
           </p>
-          <p className="text-sm text-amber-900">입금 금액: {CURRENT_SHOW_INFO.payment.amount.toLocaleString()}원</p>
+          <p className="text-sm text-amber-900">입금 금액: {show.price.toLocaleString()}원</p>
           <button
             type="button"
             onClick={() => void cancelPendingBooking()}
@@ -190,7 +223,7 @@ export default function MyTicketPage() {
 
       {status === "REFUND_PENDING" && (
         <section className="rounded-xl border border-violet-300 bg-violet-50 p-4">
-          <p className="text-sm text-violet-900">환불 대기 상태입니다. {CURRENT_SHOW_INFO.refundContact} 번호로 카카오톡 보내주세요.</p>
+          <p className="text-sm text-violet-900">환불 대기 상태입니다. {show.refundContact} 번호로 카카오톡 보내주세요.</p>
         </section>
       )}
 
@@ -280,11 +313,11 @@ export default function MyTicketPage() {
         >
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-5 text-center shadow-xl space-y-3">
             <h3 className="text-lg font-semibold">입장 QR</h3>
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(selectedQr)}`}
-              alt="입장 QR 코드"
-              className="mx-auto rounded border"
-            />
+            {qrImage ? (
+              <img src={qrImage} alt="입장 QR 코드" width={260} height={260} className="mx-auto rounded border" />
+            ) : (
+              <div className="mx-auto h-[260px] w-[260px] rounded border bg-slate-50" />
+            )}
             <p className="text-xs break-all text-slate-500">{selectedQr}</p>
             <button
               type="button"

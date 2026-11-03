@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import AdminNav from "@/components/AdminNav";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 
@@ -118,20 +118,7 @@ export default function AdminReservationsPage() {
     <main className="container-base space-y-4">
       <h1 className="text-2xl font-bold">전체 예매자 목록</h1>
 
-      <section className="space-y-3 rounded-2xl bg-white p-5 shadow">
-        <h2 className="text-lg font-semibold">관리 메뉴</h2>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/admin" className="rounded border px-3 py-2 text-sm font-semibold hover:bg-slate-50">
-            QR 검표
-          </Link>
-          <Link href="/admin/reservations" className="rounded bg-slate-900 px-3 py-2 text-sm font-semibold text-white">
-            전체 예매자 목록
-          </Link>
-          <Link href="/admin/refunds" className="rounded border px-3 py-2 text-sm font-semibold hover:bg-slate-50">
-            환불 관리
-          </Link>
-        </div>
-      </section>
+      <AdminNav />
 
       <section className="space-y-3 rounded-2xl bg-white p-5 shadow">
         <div className="flex flex-wrap items-center justify-between gap-2">

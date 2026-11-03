@@ -1,20 +1,28 @@
-﻿export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { HttpError, requireRoleAtLeast } from "@/lib/auth-helpers";
 import { RoleType } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { requireRoleAtLeast } from "@/lib/auth-helpers";
+import { errorResponse } from "@/lib/http";
 
 export async function GET() {
   try {
     await requireRoleAtLeast(RoleType.ADMIN);
     const refunds = await prisma.refund.findMany({
-      include: { reservation: { include: { user: true } }, account: true },
+      include: {
+        reservation: {
+          select: {
+            userId: true,
+            status: true,
+            qty: true,
+            user: { select: { name: true, email: true } },
+          },
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json({ refunds });
-  } catch (err: any) {
-    if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
-    console.error(err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error);
   }
 }

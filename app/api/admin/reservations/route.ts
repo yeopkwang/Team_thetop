@@ -2,9 +2,9 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRoleAtLeast, HttpError } from "@/lib/auth-helpers";
 import { RoleType } from "@prisma/client";
-import { CURRENT_SHOW_INFO } from "@/lib/show-info";
+import { requireRoleAtLeast } from "@/lib/auth-helpers";
+import { errorResponse } from "@/lib/http";
 
 const DEFAULT_LIMIT = 80;
 const MAX_LIMIT = 200;
@@ -30,7 +30,12 @@ export async function GET(req: Request) {
         qty: true,
         preferredPerformerName: true,
         createdAt: true,
-        sessionId: true,
+        session: {
+          select: {
+            id: true,
+            show: { select: { title: true, venue: true, dateLabel: true, timeLabel: true } },
+          },
+        },
         user: {
           select: {
             id: true,
@@ -56,18 +61,16 @@ export async function GET(req: Request) {
         userName: r.user.name || r.user.nickname || "사용자",
         userEmail: r.user.email || null,
         event: {
-          id: r.sessionId,
-          title: CURRENT_SHOW_INFO.title,
-          venue: CURRENT_SHOW_INFO.venue,
-          date: CURRENT_SHOW_INFO.dateLabel,
-          time: CURRENT_SHOW_INFO.timeLabel,
+          id: r.session.id,
+          title: r.session.show.title,
+          venue: r.session.show.venue,
+          date: r.session.show.dateLabel,
+          time: r.session.show.timeLabel,
         },
       })),
       nextCursor: hasNext ? rows[rows.length - 1]?.id || null : null,
     });
-  } catch (err: any) {
-    if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
-    console.error(err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error);
   }
 }

@@ -1,23 +1,23 @@
 import { NextResponse } from "next/server";
+import { Prisma, RoleType, ReservationStatus, TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { HttpError, requireRoleAtLeast } from "@/lib/auth-helpers";
-import { RoleType, ReservationStatus, TicketStatus } from "@prisma/client";
+import { requireRoleAtLeast } from "@/lib/auth-helpers";
+import { HttpError, errorResponse } from "@/lib/http";
 import { logAudit } from "@/lib/audit";
-import { CURRENT_SHOW_INFO } from "@/lib/show-info";
 
 export async function POST(req: Request) {
   try {
     const session = await requireRoleAtLeast(RoleType.STAFF);
     const body = await req.json();
     const qrToken = String(body?.qrToken || "").trim();
-    if (!qrToken) throw new HttpError(400, "qrToken 필요");
+    if (!qrToken) throw new HttpError(400, "QR 토큰이 필요합니다.");
 
     const ticket = await prisma.ticket.findUnique({
       where: { qrToken },
       include: {
         reservation: {
           include: {
-            user: true,
+            user: { select: { id: true, name: true, email: true } },
             session: { include: { show: true } },
           },
         },
@@ -25,12 +25,18 @@ export async function POST(req: Request) {
       },
     });
 
-    if (!ticket) throw new HttpError(404, "티켓 없음");
-    if (ticket.status !== TicketStatus.ACTIVE) throw new HttpError(400, "비활성 티켓");
-    if (ticket.reservation.status !== ReservationStatus.CONFIRMED) throw new HttpError(400, "확정되지 않음");
-    if (ticket.checkIn) throw new HttpError(409, "이미 체크인");
+    if (!ticket) throw new HttpError(404, "없는 티켓입니다.");
+    if (ticket.status !== TicketStatus.ACTIVE) throw new HttpError(400, "취소·환불된 티켓입니다.");
+    if (ticket.reservation.status !== ReservationStatus.CONFIRMED) throw new HttpError(400, "입금 확인이 안 된 예매입니다.");
+    if (ticket.checkIn) throw new HttpError(409, "이미 입장 처리된 티켓입니다.");
 
-    const checkIn = await prisma.checkIn.create({ data: { ticketId: ticket.id } });
+    const checkIn = await prisma.checkIn.create({ data: { ticketId: ticket.id } }).catch((e: unknown) => {
+      // 같은 QR을 두 기기에서 동시에 찍은 경우. ticketId가 unique라서 둘째는 여기서 막힌다.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        throw new HttpError(409, "이미 입장 처리된 티켓입니다.");
+      }
+      throw e;
+    });
     await logAudit({
       action: "CHECKIN_CREATED",
       entityType: "CheckIn",
@@ -39,18 +45,15 @@ export async function POST(req: Request) {
       after: { ticketId: ticket.id },
     });
 
+    const show = ticket.reservation.session.show;
     return NextResponse.json({
       checkIn,
-      member: {
-        id: ticket.reservation.user.id,
-        name: ticket.reservation.user.name,
-        email: ticket.reservation.user.email,
-      },
+      member: ticket.reservation.user,
       performance: {
-        title: CURRENT_SHOW_INFO.title,
-        venue: CURRENT_SHOW_INFO.venue,
-        date: CURRENT_SHOW_INFO.dateLabel,
-        time: CURRENT_SHOW_INFO.timeLabel,
+        title: show.title,
+        venue: show.venue,
+        date: show.dateLabel,
+        time: show.timeLabel,
       },
       ticket: {
         id: ticket.id,
@@ -58,9 +61,7 @@ export async function POST(req: Request) {
         reservationId: ticket.reservationId,
       },
     });
-  } catch (err: any) {
-    if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
-    console.error(err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  } catch (error) {
+    return errorResponse(error);
   }
 }

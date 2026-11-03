@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import AdminNav from "@/components/AdminNav";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 
@@ -42,7 +42,7 @@ export default function AdminRefundsPage() {
     setMessage("");
     try {
       await apiFetch(`/admin/refunds/${id}/refund`, { method: "POST", bodyJson: {} });
-      setMessage("환불 완료 처리되었습니다. 좌석 수량이 복구되었습니다.");
+      setMessage("환불 완료 처리되었습니다.");
       await load();
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : "환불 완료 처리에 실패했습니다.");
@@ -53,17 +53,7 @@ export default function AdminRefundsPage() {
     <main className="container-base space-y-4">
       <h1 className="text-2xl font-bold">환불 관리</h1>
 
-      <div className="flex flex-wrap gap-2">
-        <Link href="/admin" className="rounded border px-3 py-2 text-sm font-semibold hover:bg-slate-50">
-          QR 검표
-        </Link>
-        <Link href="/admin/reservations" className="rounded border px-3 py-2 text-sm font-semibold hover:bg-slate-50">
-          전체 예매자 목록
-        </Link>
-        <Link href="/admin/refunds" className="rounded bg-slate-900 px-3 py-2 text-sm font-semibold text-white">
-          환불 관리
-        </Link>
-      </div>
+      <AdminNav />
 
       {message && <div className="text-sm text-slate-700">{message}</div>}
 
