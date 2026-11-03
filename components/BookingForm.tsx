@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ApiError, apiFetch, getToken } from "@/lib/api-client";
-import { won } from "@/lib/format";
+import { formatSessionDate, won } from "@/lib/format";
+import { salesState, untilText } from "@/lib/sales";
+import { reservationStatus } from "@/lib/status";
 import { KakaoIcon } from "./icons";
 import Poster from "./show/Poster";
+import { useSalesClock } from "./useSalesClock";
 
 type ShowProps = {
   title: string;
@@ -17,9 +20,14 @@ type ShowProps = {
   paymentBank: string;
   paymentAccount: string;
   paymentHolder: string;
+  salesOpenAt: string | null;
 };
 
-type SessionProps = { id: string; title: string; dateText: string; remaining: number; total: number };
+type SessionProps = { id: string; title: string; dateText: string; startsAt: string; remaining: number; total: number };
+
+// 이미 예매가 있으면 다시 예매할 수 없는 상태(취소·환불·만료는 다시 예매할 수 있다)
+const ACTIVE_BOOKING = ["REQUESTED", "PAYMENT_PENDING", "CONFIRMED", "REFUND_REQUESTED", "REFUND_PENDING"];
+const OTHER = "__other";
 
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
@@ -39,38 +47,64 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 export default function BookingForm({
   show,
   sessions,
+  performers,
   initialSessionId,
 }: {
   show: ShowProps;
   sessions: SessionProps[];
+  performers: string[];
   initialSessionId?: string;
 }) {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const [existing, setExisting] = useState<{ status: string } | null>(null);
   // 공연 안내 달력에서 고른 회차가 있으면 그것부터, 없으면 남은 좌석이 있는 첫 회차
   const [sessionId, setSessionId] = useState(
     sessions.find((s) => s.id === initialSessionId && s.remaining > 0)?.id || sessions.find((s) => s.remaining > 0)?.id || ""
   );
-  const [performer, setPerformer] = useState("");
+  // 크레딧이 있으면 목록에서 고르고, 목록에 없으면 직접 적는다. 크레딧이 없으면 처음부터 직접 적는다.
+  const [choice, setChoice] = useState("");
+  const [typed, setTyped] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
+  const { now } = useSalesClock(show.salesOpenAt);
+  const state = salesState({ salesOpenAt: show.salesOpenAt, sessions: sessions.map((s) => ({ date: s.startsAt, remaining: s.remaining })) }, now);
+
   useEffect(() => {
-    setLoggedIn(!!getToken());
+    const token = !!getToken();
+    setLoggedIn(token);
+    if (!token) return;
+    // 이미 예매했으면 폼을 다 채운 뒤에야 알게 되지 않도록 먼저 알려 준다.
+    apiFetch<{ booking: { status: string } | null }>("/my/ticket-dashboard")
+      .then((data) => {
+        if (data.booking && ACTIVE_BOOKING.includes(data.booking.status)) setExisting(data.booking);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof ApiError && error.status === 401) setLoggedIn(false);
+      });
   }, []);
 
+  const performer = performers.length > 0 && choice !== OTHER ? choice : typed.trim();
   const selected = sessions.find((s) => s.id === sessionId);
-  const ready = Boolean(loggedIn && selected && performer.trim() && agreed);
+  const loginHref = `/login?next=${encodeURIComponent(`/book${sessionId ? `?session=${sessionId}` : ""}`)}`;
+  const ready = Boolean(loggedIn && !existing && state === "open" && selected && performer && agreed);
 
   const missing = !loggedIn
     ? "로그인하면 예매할 수 있어요."
-    : !selected
-      ? "예매할 수 있는 회차가 없어요."
-      : !performer.trim()
-        ? "관심 있는 공연자를 적어 주세요."
-        : !agreed
-          ? "취소·환불 규정에 동의해 주세요."
-          : "";
+    : existing
+      ? "이미 예매한 공연이에요."
+      : state === "upcoming"
+        ? "티켓 오픈 시각이 되면 예매할 수 있어요."
+        : state === "closed"
+          ? "예매가 끝났어요."
+          : !selected
+            ? "예매할 수 있는 회차가 없어요."
+            : !performer
+              ? "관심 있는 공연자를 골라 주세요."
+              : !agreed
+                ? "취소·환불 규정에 동의해 주세요."
+                : "";
 
   const submit = async () => {
     if (!ready || submitting) return;
@@ -79,9 +113,9 @@ export default function BookingForm({
     try {
       await apiFetch("/bookings", {
         method: "POST",
-        bodyJson: { eventId: sessionId, quantity: 1, preferredPerformerName: performer.trim() },
+        bodyJson: { eventId: sessionId, quantity: 1, preferredPerformerName: performer },
       });
-      window.location.href = "/myticket";
+      window.location.href = "/myticket?booked=1";
     } catch (error: unknown) {
       if (error instanceof ApiError && error.status === 401) setLoggedIn(false);
       setMessage(error instanceof Error ? error.message : "예매하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
@@ -89,7 +123,15 @@ export default function BookingForm({
     }
   };
 
-  const submitLabel = submitting ? "예매하는 중" : "예매하기";
+  const submitLabel = submitting
+    ? "예매하는 중"
+    : state === "upcoming"
+      ? "오픈 예정"
+      : state === "closed"
+        ? "예매 종료"
+        : state === "soldout"
+          ? "매진"
+          : "예매하기";
 
   return (
     <main className="page-enter pb-16">
@@ -98,10 +140,27 @@ export default function BookingForm({
 
         <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-10">
           <div className="space-y-8">
+            {state === "upcoming" && show.salesOpenAt && (
+              <div className="rounded-lg bg-ink p-4 text-white">
+                <p className="text-meta text-white/70">티켓 오픈 {formatSessionDate(show.salesOpenAt)}</p>
+                <p className="mt-0.5 text-h2 font-bold tabular-nums">{untilText(show.salesOpenAt, now)}</p>
+                <p className="mt-1 text-meta text-white/70">시각이 되면 이 화면에서 예매 버튼이 바로 열려요. 미리 아래 내용을 채워 두세요.</p>
+              </div>
+            )}
+            {existing && (
+              <div className="flex flex-col gap-3 rounded-lg border border-brand-200 bg-brand-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-ui text-brand-800">
+                  이미 예매한 공연이에요. 지금 상태는 <strong className="font-semibold">{reservationStatus(existing.status).label}</strong>예요.
+                </p>
+                <Link href="/myticket" className="btn-primary btn-sm">
+                  마이 티켓 보기
+                </Link>
+              </div>
+            )}
             {loggedIn === false && (
               <div className="flex flex-col gap-3 rounded-lg bg-brand-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-ui text-brand-800">카카오로 로그인하면 바로 예매할 수 있어요.</p>
-                <Link href="/login" className="btn btn-sm bg-kakao text-black/85 hover:brightness-95">
+                <p className="text-ui text-brand-800">카카오로 로그인하면 바로 예매할 수 있어요. 로그인한 뒤 이 화면으로 돌아와요.</p>
+                <Link href={loginHref} className="btn btn-sm bg-kakao text-black/85 hover:brightness-95">
                   <KakaoIcon className="h-4 w-4" />
                   카카오 로그인
                 </Link>
@@ -112,7 +171,7 @@ export default function BookingForm({
               <div className="space-y-2" role="radiogroup" aria-label="관람 회차">
                 {sessions.map((s) => {
                   const checked = s.id === sessionId;
-                  const soldOut = s.remaining === 0;
+                  const soldOut = s.remaining === 0 || new Date(s.startsAt).getTime() <= now;
                   return (
                     <label
                       key={s.id}
@@ -146,23 +205,65 @@ export default function BookingForm({
             </Step>
 
             <Step n={2} title="관심 있는 공연자">
-              <p className="text-ui text-ink-2">초대해 준 공연자가 있으면 이름을 적어 주세요. 없으면 &apos;없음&apos;을 눌러 주세요.</p>
-              <div className="mt-3 flex gap-2">
-                <label htmlFor="performer" className="sr-only">
-                  관심 있는 공연자 이름
-                </label>
-                <input
-                  id="performer"
-                  value={performer}
-                  onChange={(e) => setPerformer(e.target.value)}
-                  placeholder="예: 홍길동"
-                  maxLength={50}
-                  className="field"
-                />
-                <button type="button" onClick={() => setPerformer("없음")} className="btn-secondary shrink-0">
-                  없음
-                </button>
-              </div>
+              {performers.length > 0 ? (
+                <>
+                  <p className="text-ui text-ink-2">초대해 준 공연자를 골라 주세요. 없으면 &apos;없음&apos;을 골라 주세요.</p>
+                  <label htmlFor="performer" className="sr-only">
+                    관심 있는 공연자
+                  </label>
+                  <select
+                    id="performer"
+                    value={choice}
+                    onChange={(e) => setChoice(e.target.value)}
+                    className={`field mt-3 appearance-none bg-[length:16px] bg-[right_12px_center] bg-no-repeat pr-10 ${choice ? "" : "text-ink-4"}`}
+                    style={{
+                      backgroundImage:
+                        "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
+                    }}
+                  >
+                    <option value="" disabled>
+                      공연자를 골라 주세요
+                    </option>
+                    {performers.map((name) => (
+                      <option key={name} value={name} className="text-ink">
+                        {name}
+                      </option>
+                    ))}
+                    <option value="없음" className="text-ink">
+                      없음
+                    </option>
+                    <option value={OTHER} className="text-ink">
+                      목록에 없어요 (직접 적기)
+                    </option>
+                  </select>
+                  {choice === OTHER && (
+                    <input
+                      value={typed}
+                      onChange={(e) => setTyped(e.target.value)}
+                      placeholder="공연자 이름"
+                      maxLength={50}
+                      className="field mt-2"
+                      aria-label="관심 있는 공연자 이름"
+                      autoFocus
+                    />
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-ui text-ink-2">초대해 준 공연자가 있으면 이름을 적어 주세요. 없으면 &apos;없음&apos;이라고 적어 주세요.</p>
+                  <label htmlFor="performer" className="sr-only">
+                    관심 있는 공연자 이름
+                  </label>
+                  <input
+                    id="performer"
+                    value={typed}
+                    onChange={(e) => setTyped(e.target.value)}
+                    placeholder="예: 홍길동"
+                    maxLength={50}
+                    className="field mt-3"
+                  />
+                </>
+              )}
             </Step>
 
             <Step n={3} title="입금 방법">
@@ -233,7 +334,7 @@ export default function BookingForm({
                   />
                   <span>
                     취소·환불 규정을 확인했고 동의해요. 규정은{" "}
-                    <Link href="/show" className="font-semibold text-ink underline underline-offset-2">
+                    <Link href="/show#sales" className="font-semibold text-ink underline underline-offset-2">
                       공연 안내의 판매 정보
                     </Link>
                     에 있어요.

@@ -88,13 +88,13 @@ async function seedAdmin() {
   console.log(`관리자 계정 '${username}'을(를) 만들었습니다.`);
 }
 
-// 지난 공연. 4회는 2026년 공연 안내 페이지에 실렸던 내용이고, 1~3회는 제목과 연도만 넣어 둔다
+// 지난 공연. 4회는 2026년 공연 안내 페이지에 실렸던 내용이고, 1~3회는 제목과 연도, 임시 포스터만 넣어 둔다
 // (2023년에 시작해 해마다 열린 것으로 보고 연도를 적었다). 나머지는 관리자 페이지에서 채운다.
 // 회차 날짜는 지난 공연 목록의 순서를 정하는 데 쓰인다.
 const PAST_SHOWS = [
-  { id: "operation-moon-1", title: "작전명문 1", dateLabel: "2023년", date: "2023-02-01T09:00:00Z" },
-  { id: "operation-moon-2", title: "작전명문 2", dateLabel: "2024년", date: "2024-02-01T09:00:00Z" },
-  { id: "operation-moon-3", title: "작전명문 3", dateLabel: "2025년", date: "2025-02-01T09:00:00Z" },
+  { id: "operation-moon-1", title: "작전명문 1", dateLabel: "2023년", date: "2023-02-01T09:00:00Z", posterUrl: "/posters/operation-moon-1.png" },
+  { id: "operation-moon-2", title: "작전명문 2", dateLabel: "2024년", date: "2024-02-01T09:00:00Z", posterUrl: "/posters/operation-moon-2.png" },
+  { id: "operation-moon-3", title: "작전명문 3", dateLabel: "2025년", date: "2025-02-01T09:00:00Z", posterUrl: "/posters/operation-moon-3.png" },
   {
     id: "operation-moon-4",
     title: "작전명문 4",
@@ -160,6 +160,7 @@ async function seedShows() {
   await prisma.show.create({
     data: {
       title: "작전명문 5",
+      posterUrl: "/posters/operation-moon-5.png",
       notice:
         "본 공연은 온라인 예매로 진행되며, 예매하신 티켓의 취소/환불 관련 사항은 공연 안내 규정에 따라 적용됩니다.",
       contactTag: "@band.bansong",

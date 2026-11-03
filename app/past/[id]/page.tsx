@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ShowText from "@/components/ShowText";
+import CreditsTable from "@/components/show/CreditsTable";
 import { ChevronRightIcon } from "@/components/icons";
 import { MobilePosterHero } from "@/components/show/Poster";
 import ShowSummary from "@/components/show/ShowSummary";
@@ -31,6 +32,7 @@ export default async function PastShowPage({ params }: { params: { id: string } 
         <p className="text-ui text-ink-3">이 공연의 소개와 셋리스트를 정리하고 있어요.</p>
       ),
     },
+    ...(show.credits.trim() ? [{ id: "credits", label: "크레딧", content: <CreditsTable credits={show.credits} /> }] : []),
     ...(show.venue
       ? [{ id: "venue", label: "장소정보", content: <VenueInfo venue={show.venue} address={show.venueAddress} /> }]
       : []),

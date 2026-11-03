@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Tab = { id: string; label: string; content: React.ReactNode };
 
@@ -8,6 +8,17 @@ type Tab = { id: string; label: string; content: React.ReactNode };
 export default function ShowTabs({ tabs }: { tabs: Tab[] }) {
   const [active, setActive] = useState(tabs[0]?.id);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // /show#sales 처럼 들어오면 그 탭을 열고 탭 위치로 내려 준다(예매 화면의 환불 규정 링크).
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (!tabs.some((t) => t.id === id)) return;
+    setActive(id);
+    const headerH = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--header-h")) || 0;
+    const root = rootRef.current;
+    if (root) window.scrollTo({ top: root.getBoundingClientRect().top + window.scrollY - headerH });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (tabs.length === 0) return null;
 

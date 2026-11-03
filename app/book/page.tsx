@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import BookingForm from "@/components/BookingForm";
 import EmptyState from "@/components/EmptyState";
+import { performerNames } from "@/lib/credits";
 import { formatSessionDate } from "@/lib/format";
 import { getCurrentShow, getSessionAvailability } from "@/lib/show";
 
@@ -25,6 +26,7 @@ export default async function BookPage({ searchParams }: { searchParams: { sessi
   return (
     <BookingForm
       initialSessionId={searchParams.session}
+      performers={performerNames(show.credits)}
       show={{
         title: show.title,
         posterUrl: show.posterUrl,
@@ -35,11 +37,13 @@ export default async function BookPage({ searchParams }: { searchParams: { sessi
         paymentBank: show.paymentBank,
         paymentAccount: show.paymentAccount,
         paymentHolder: show.paymentHolder,
+        salesOpenAt: show.salesOpenAt?.toISOString() ?? null,
       }}
       sessions={sessions.map((s) => ({
         id: s.id,
         title: s.title,
         dateText: formatSessionDate(s.date),
+        startsAt: s.date.toISOString(),
         remaining: s.remaining,
         total: s.total,
       }))}

@@ -26,6 +26,12 @@ export const showInput = z.object({
   refundContact: text,
   introText: text,
   salesText: text,
+  credits: text,
+  salesOpenAt: z
+    .string()
+    .datetime({ message: "티켓 오픈 일시가 올바르지 않습니다." })
+    .nullish()
+    .transform((v) => (v ? new Date(v) : null)),
   status: z.nativeEnum(ShowStatus),
   session: z.object({
     title: z.string().trim().min(1).max(100).default("1회차"),

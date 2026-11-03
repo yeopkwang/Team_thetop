@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { createToken } from "@/lib/jwt";
 import { RoleType } from "@prisma/client";
+import { SERVER_ERROR } from "@/lib/http";
 
 export async function POST(req: Request) {
   try {
@@ -60,6 +61,6 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ error: SERVER_ERROR }, { status: 500 });
   }
 }

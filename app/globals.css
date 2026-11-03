@@ -105,7 +105,7 @@
   animation: bone-pulse 1.4s ease-in-out infinite;
 }
 
-/* 첫 화면이 열릴 때 한 번만: 名門이 천천히 드러나고, 제목과 버튼이 차례로 떠오른다. */
+/* 첫 화면이 열릴 때 한 번만: 지난 포스터부터 이번 포스터까지 차례로 서고, 제목과 버튼이 뒤따른다. */
 @keyframes landing-rise {
   from {
     opacity: 0;
@@ -116,21 +116,8 @@
     transform: none;
   }
 }
-@keyframes landing-glyph {
-  from {
-    opacity: 0;
-    transform: scale(1.08);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
 .anim-rise {
   animation: landing-rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-.anim-glyph {
-  animation: landing-glyph 2s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
 @media (max-width: 1023px) {

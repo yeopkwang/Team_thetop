@@ -2,14 +2,29 @@
 
 import Link from "next/link";
 import { FormEvent, Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { KakaoIcon } from "@/components/icons";
 import Wordmark from "@/components/Wordmark";
 import { apiFetch, clearAuthState, getAuthProvider, setAuthProvider, setToken } from "@/lib/api-client";
 
 type User = { id: string; name?: string | null; email?: string | null; roles?: string[] };
 
+const NEXT_KEY = "login_next";
+
+// 로그인 뒤 돌아갈 곳. 카카오를 다녀오면 주소의 next가 사라지므로 sessionStorage에 잠시 둔다.
+// 다른 사이트로 보내는 주소(//evil.com 등)는 받지 않는다.
+function popNext() {
+  try {
+    const next = window.sessionStorage.getItem(NEXT_KEY);
+    window.sessionStorage.removeItem(NEXT_KEY);
+    return next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+  } catch {
+    return null;
+  }
+}
+
 function LoginPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [message, setMessage] = useState("");
   const [user, setUser] = useState<User | null>(null);
@@ -35,13 +50,27 @@ function LoginPageContent() {
 
     // 카카오 로그인 콜백은 토큰을 주소의 # 뒤에 붙여 돌려보낸다.
     const kakaoToken = new URLSearchParams(window.location.hash.slice(1)).get("kakaoToken");
+
+    // 돌아갈 곳이 있으면 기억하고, 그냥 들어온 경우엔 예전에 남은 값을 지운다.
+    const next = searchParams.get("next");
+    try {
+      if (next) window.sessionStorage.setItem(NEXT_KEY, next);
+      else if (!kakaoToken) window.sessionStorage.removeItem(NEXT_KEY);
+    } catch {
+      // 저장이 막혀 있으면 로그인 뒤 이 화면에 머문다
+    }
     if (kakaoToken) {
       setToken(kakaoToken);
       setAuthProvider("kakao");
       window.history.replaceState(null, "", "/login");
+      const back = popNext();
+      if (back) {
+        router.replace(back);
+        return;
+      }
     }
     void refreshMe();
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const handleAdminLogin = async (event: FormEvent) => {
     event.preventDefault();
@@ -54,6 +83,11 @@ function LoginPageContent() {
       });
       setToken(data.token);
       setAuthProvider("admin");
+      const back = popNext();
+      if (back) {
+        router.replace(back);
+        return;
+      }
       await refreshMe();
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : "로그인하지 못했어요.");

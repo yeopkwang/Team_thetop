@@ -1,13 +1,13 @@
 import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import { Noto_Serif_KR } from "next/font/google";
+import { Black_Han_Sans } from "next/font/google";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 
-// 첫 화면 제목과 로고에만 쓰는 명조체. 한글 조각 파일이 많아서 미리 불러오지는 않는다.
-const display = Noto_Serif_KR({
-  weight: "900",
+// 로고와 첫 화면 제목에만 쓰는 굵은 제목체. 한글 조각 파일이 많아서 미리 불러오지는 않는다.
+const display = Black_Han_Sans({
+  weight: "400",
   subsets: ["latin"],
   preload: false,
   display: "swap",

@@ -105,6 +105,10 @@ model Show {
   // 빈 줄로 칸을 나누고, 칸의 첫 줄이 "# "로 시작하면 굵은 제목으로 보인다.
   introText      String     @default("")
   salesText      String     @default("")
+  // 크레딧(공연자 명단). 한 줄에 "파트: 이름, 이름". 예매할 때 관심 있는 공연자를 이 명단에서 고른다.
+  credits        String     @default("")
+  // 티켓 오픈 일시. 비워 두면 판매 중으로 바꾸는 즉시 예매를 받는다.
+  salesOpenAt    DateTime?
   status         ShowStatus @default(DRAFT)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
@@ -197,4 +201,14 @@ model Credential {
   passwordHash String
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// 관리자가 올린 이미지(포스터). /api/assets/{id}로 내려준다.
+// Vercel은 서버에 파일을 저장할 수 없어서 DB에 담는다. 포스터 몇 장이면 용량 걱정은 없다.
+model Asset {
+  id        String   @id @default(cuid())
+  mimeType  String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
 }

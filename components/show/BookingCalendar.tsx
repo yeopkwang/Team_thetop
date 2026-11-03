@@ -2,14 +2,17 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { won } from "@/lib/format";
+import { formatSessionDate, won } from "@/lib/format";
+import { salesState, untilText } from "@/lib/sales";
 import { ChevronRightIcon } from "../icons";
+import { useSalesClock } from "../useSalesClock";
 
 export type CalendarSession = {
   id: string;
   title: string;
   dayKey: string; // 한국 시간 기준 2027-02-21
   time: string; // 18:00
+  startsAt: string; // ISO
   remaining: number;
   total: number;
 };
@@ -32,7 +35,17 @@ function monthCells(month: string) {
 }
 
 // PC 공연 안내 오른쪽의 예매 패널: 관람일 달력 → 회차 → 잔여석 → 예매하기.
-export default function BookingCalendar({ sessions, price }: { sessions: CalendarSession[]; price: number }) {
+export default function BookingCalendar({
+  sessions,
+  price,
+  salesOpenAt,
+}: {
+  sessions: CalendarSession[];
+  price: number;
+  salesOpenAt: string | null;
+}) {
+  const { now } = useSalesClock(salesOpenAt);
+  const state = salesState({ salesOpenAt, sessions: sessions.map((s) => ({ date: s.startsAt, remaining: s.remaining })) }, now);
   const months = useMemo(() => Array.from(new Set(sessions.map((s) => monthKey(s.dayKey)))).sort(), [sessions]);
   const firstOpen = sessions.find((s) => s.remaining > 0) || sessions[0];
 
@@ -126,7 +139,7 @@ export default function BookingCalendar({ sessions, price }: { sessions: Calenda
           {daySessions.length === 0 && <p className="col-span-2 text-meta text-ink-3">관람일을 골라 주세요.</p>}
           {daySessions.map((s, i) => {
             const on = s.id === sessionId;
-            const soldOut = s.remaining === 0;
+            const soldOut = s.remaining === 0 || new Date(s.startsAt).getTime() <= now;
             return (
               <button
                 key={s.id}
@@ -164,13 +177,19 @@ export default function BookingCalendar({ sessions, price }: { sessions: Calenda
       </section>
 
       <div className="p-5">
-        {selected && selected.remaining > 0 ? (
+        {state === "upcoming" && salesOpenAt && (
+          <div className="mb-3 rounded-md bg-brand-50 px-3 py-2.5 text-center">
+            <p className="text-meta font-semibold text-brand-700">티켓 오픈 {formatSessionDate(salesOpenAt)}</p>
+            <p className="mt-0.5 text-[15px] font-bold tabular-nums text-brand-600">{untilText(salesOpenAt, now)}</p>
+          </div>
+        )}
+        {state === "open" && selected && selected.remaining > 0 && new Date(selected.startsAt).getTime() > now ? (
           <Link href={`/book?session=${selected.id}`} className="btn-primary btn-lg w-full">
             예매하기
           </Link>
         ) : (
           <span className="btn btn-lg w-full cursor-not-allowed bg-ink-4 text-white">
-            {selected ? "매진" : "예매하기"}
+            {state === "upcoming" ? "오픈 예정" : state === "closed" ? "예매 종료" : state === "soldout" ? "매진" : "예매하기"}
           </span>
         )}
         <p className="mt-3 text-center text-cap text-ink-3">1인 1매 예매 가능 | 무통장 입금</p>

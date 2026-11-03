@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { performerNames } from "@/lib/credits";
 import { SHOW_STATUS, type ShowStatusKey } from "@/lib/status";
 
 type FormState = {
@@ -25,14 +26,17 @@ type FormState = {
   refundContact: string;
   introText: string;
   salesText: string;
+  credits: string;
+  salesOpenAt: string;
   status: ShowStatusKey;
   sessionDate: string;
   totalCapacity: number;
 };
 
-type ShowDetail = Omit<FormState, "posterUrl" | "sessionDate" | "totalCapacity"> & {
+type ShowDetail = Omit<FormState, "posterUrl" | "sessionDate" | "totalCapacity" | "salesOpenAt"> & {
   id: string;
   posterUrl: string | null;
+  salesOpenAt: string | null;
   session: { title: string; date: string; totalCapacity: number } | null;
   reservedQty: number;
 };
@@ -56,12 +60,14 @@ const EMPTY: FormState = {
   refundContact: "",
   introText: "",
   salesText: "",
+  credits: "",
+  salesOpenAt: "",
   status: "DRAFT",
   sessionDate: "",
   totalCapacity: 100,
 };
 
-// 새 공연을 만들 때 최근 공연에서 그대로 가져올 만한 값(장소, 입금, 판매 안내 등)
+// 새 공연을 만들 때 최근 공연에서 그대로 가져올 만한 값(장소, 입금, 판매 안내 등). 크레딧은 해마다 바뀌니 가져오지 않는다.
 const CARRY_OVER: (keyof FormState)[] = [
   "timeLabel",
   "timeSubLabel",
@@ -88,11 +94,12 @@ function toLocalInput(iso: string) {
 }
 
 function toForm(show: ShowDetail): FormState {
-  const { session, reservedQty: _r, posterUrl, id: _id, ...fields } = show;
+  const { session, reservedQty: _r, posterUrl, salesOpenAt, id: _id, ...fields } = show;
   return {
     ...EMPTY,
     ...fields,
     posterUrl: posterUrl || "",
+    salesOpenAt: salesOpenAt ? toLocalInput(salesOpenAt) : "",
     sessionDate: session ? toLocalInput(session.date) : "",
     totalCapacity: session?.totalCapacity ?? EMPTY.totalCapacity,
   };
@@ -128,6 +135,7 @@ export default function ShowForm({ showId }: { showId?: string }) {
   const [carriedFrom, setCarriedFrom] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -171,8 +179,12 @@ export default function ShowForm({ showId }: { showId?: string }) {
     setSaving(true);
     setMessage("");
     try {
-      const { sessionDate, totalCapacity, ...fields } = form;
-      const body = { ...fields, session: { date: new Date(sessionDate).toISOString(), totalCapacity } };
+      const { sessionDate, totalCapacity, salesOpenAt, ...fields } = form;
+      const body = {
+        ...fields,
+        salesOpenAt: salesOpenAt ? new Date(salesOpenAt).toISOString() : null,
+        session: { date: new Date(sessionDate).toISOString(), totalCapacity },
+      };
       if (showId) {
         const { show } = await apiFetch<{ show: ShowDetail }>(`/admin/shows/${showId}`, { method: "PUT", bodyJson: body });
         setForm(toForm(show));
@@ -186,6 +198,23 @@ export default function ShowForm({ showId }: { showId?: string }) {
       setMessage(error instanceof Error ? error.message : "저장하지 못했어요.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const uploadPoster = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    setMessage("");
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const { url } = await apiFetch<{ url: string }>("/admin/assets", { method: "POST", body });
+      set("posterUrl", url);
+      setMessage("포스터를 올렸어요. 저장하면 반영돼요.");
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : "포스터를 올리지 못했어요.");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -240,7 +269,17 @@ export default function ShowForm({ showId }: { showId?: string }) {
         )}
       </Group>
 
-      <Group title="판매" description="공연 일시는 회차 정렬과 예매 화면, 지난 공연 순서에 쓰여요.">
+      <Group title="판매" description="공연 일시는 회차 정렬과 예매 화면, 지난 공연 순서에 쓰여요. 공연이 시작하면 예매가 닫혀요.">
+        <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+          <Field label="티켓 오픈 일시 (선택)" hint="비워 두면 판매 중으로 바꾸는 즉시 예매를 받아요. 정해 두면 그 시각에 예매 버튼이 열려요.">
+            <input type="datetime-local" className="field" {...text("salesOpenAt")} />
+          </Field>
+          {form.salesOpenAt && (
+            <button type="button" onClick={() => set("salesOpenAt", "")} className="btn-ghost text-meta sm:mb-6">
+              비우기
+            </button>
+          )}
+        </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="공연 일시">
             <input type="datetime-local" className="field" {...text("sessionDate")} />
@@ -270,16 +309,36 @@ export default function ShowForm({ showId }: { showId?: string }) {
 
       <Group title="공연 정보" description="첫 화면과 공연 안내의 포스터 옆 정보에 나와요. 비워 둔 줄은 보이지 않아요.">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="공연 제목" className="sm:col-span-2">
+          <Field label="공연명" className="sm:col-span-2">
             <input className="field" placeholder="작전명문 5" {...text("title")} />
           </Field>
-          <Field
-            label="포스터 주소"
-            className="sm:col-span-2"
-            hint="public 폴더의 파일이면 /uploads/poster.png 처럼, 외부 이미지면 https:// 주소를 적어 주세요."
-          >
-            <input className="field" {...text("posterUrl")} />
-          </Field>
+          <div className="sm:col-span-2">
+            <span className="label">포스터</span>
+            <div className="mt-1.5 flex gap-4">
+              <div className="aspect-[3/4] w-24 shrink-0 overflow-hidden rounded border border-line bg-surface">
+                {form.posterUrl && <img src={form.posterUrl} alt="포스터 미리보기" className="h-full w-full object-cover" />}
+              </div>
+              <div className="min-w-0 flex-1 space-y-2">
+                <label className={`btn-secondary btn-sm cursor-pointer ${uploading ? "pointer-events-none opacity-60" : ""}`}>
+                  {uploading ? "올리는 중" : form.posterUrl ? "다른 이미지로 바꾸기" : "이미지 올리기"}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="sr-only"
+                    onChange={(e) => {
+                      void uploadPoster(e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <p className="text-cap text-ink-3">4MB 이하 PNG·JPG·WEBP. 세로 3:4 비율이 가장 잘 맞아요.</p>
+                <label className="block">
+                  <span className="sr-only">포스터 이미지 주소</span>
+                  <input className="field text-ui" placeholder="또는 이미지 주소 (https://...)" {...text("posterUrl")} />
+                </label>
+              </div>
+            </div>
+          </div>
           <Field label="공연일 (화면 문구)" hint="첫 화면·티켓·지난 공연에 이 문구가 나와요.">
             <input className="field" placeholder="2027년 02월 21일 (일)" {...text("dateLabel")} />
           </Field>
@@ -310,6 +369,25 @@ export default function ShowForm({ showId }: { showId?: string }) {
         </div>
       </Group>
 
+      <Group
+        title="크레딧"
+        description="공연자 명단이에요. 공연 안내와 지난 공연의 크레딧 탭에 나오고, 관객은 예매할 때 관심 있는 공연자를 이 명단에서 골라요."
+      >
+        <Field label="공연자 명단" hint="한 줄에 '파트: 이름, 이름' 꼴로 적어 주세요. 같은 사람이 여러 파트에 있어도 예매 목록에는 한 번만 나와요.">
+          <textarea
+            rows={8}
+            className="field text-ui leading-7"
+            placeholder={"보컬: 홍길동, 김철수\n기타: 이영희\n베이스: 박민수\n드럼: 최지우"}
+            {...text("credits")}
+          />
+        </Field>
+        {form.credits.trim() && (
+          <p className="text-meta text-ink-2">
+            예매 화면에 나올 공연자 {performerNames(form.credits).length}명: {performerNames(form.credits).join(", ")}
+          </p>
+        )}
+      </Group>
+
       <Group title="입금·환불" description="예매 화면과 마이 티켓의 입금 안내, 판매정보 표에 나와요.">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="은행">
@@ -329,10 +407,10 @@ export default function ShowForm({ showId }: { showId?: string }) {
 
       <Group title="긴 안내문" description="빈 줄로 묶음을 나눠요. 묶음의 첫 줄을 '# 제목'으로 쓰면 소제목이 붙어요.">
         <Field label="공연정보 탭" hint="공연 소개, 셋리스트 등. 지난 공연 화면에도 이 내용이 나와요.">
-          <textarea rows={14} className="field font-mono text-ui" {...text("introText")} />
+          <textarea rows={14} className="field text-ui leading-7" {...text("introText")} />
         </Field>
         <Field label="판매정보 탭" hint="공연 개요, 관람료, 환불 기준, 입장 안내 등">
-          <textarea rows={20} className="field font-mono text-ui" {...text("salesText")} />
+          <textarea rows={20} className="field text-ui leading-7" {...text("salesText")} />
         </Field>
       </Group>
 

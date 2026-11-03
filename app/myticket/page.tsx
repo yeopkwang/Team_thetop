@@ -85,6 +85,7 @@ export default function MyTicketPage() {
   const [qrImage, setQrImage] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [justBooked, setJustBooked] = useState(false);
 
   const load = async () => {
     if (!getToken()) {
@@ -105,6 +106,11 @@ export default function MyTicketPage() {
   };
 
   useEffect(() => {
+    // 예매 화면에서 막 넘어왔으면 접수 안내를 한 번 보여 주고 주소는 깨끗하게 둔다.
+    if (new URLSearchParams(window.location.search).get("booked") === "1") {
+      setJustBooked(true);
+      window.history.replaceState(null, "", "/myticket");
+    }
     void load();
   }, []);
 
@@ -156,7 +162,7 @@ export default function MyTicketPage() {
   } else if (view === "login") {
     body = (
       <EmptyState title="로그인하면 예매한 티켓을 볼 수 있어요" description="예매할 때 쓴 카카오 계정으로 로그인해 주세요.">
-        <Link href="/login" className="btn-primary">
+        <Link href="/login?next=/myticket" className="btn-primary">
           로그인하기
         </Link>
       </EmptyState>
@@ -185,6 +191,11 @@ export default function MyTicketPage() {
 
     body = (
       <div className="mx-auto max-w-[400px] space-y-4">
+        {justBooked && booking.status === "PAYMENT_PENDING" && (
+          <p role="status" className="rounded-xl bg-ok-50 px-5 py-4 text-ui font-semibold text-ok-600">
+            예매가 접수됐어요. 아래 계좌로 입금하면 예매가 완료돼요.
+          </p>
+        )}
         {booking.status === "PAYMENT_PENDING" && <PaymentGuide show={show} />}
 
         <TicketStub

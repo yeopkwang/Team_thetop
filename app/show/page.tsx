@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import EmptyState from "@/components/EmptyState";
 import ShowText from "@/components/ShowText";
 import BookingCalendar from "@/components/show/BookingCalendar";
+import CreditsTable from "@/components/show/CreditsTable";
 import MobileBookingBar from "@/components/show/MobileBookingBar";
 import { MobilePosterHero } from "@/components/show/Poster";
 import SalesInfoTable from "@/components/show/SalesInfoTable";
@@ -52,6 +53,7 @@ export default async function ShowPage() {
         </div>
       ),
     },
+    ...(show.credits.trim() ? [{ id: "credits", label: "크레딧", content: <CreditsTable credits={show.credits} /> }] : []),
     {
       id: "sales",
       label: "판매정보",
@@ -81,11 +83,13 @@ export default async function ShowPage() {
           <div className="sticky top-[calc(var(--header-h)+24px)]">
             <BookingCalendar
               price={show.price}
+              salesOpenAt={show.salesOpenAt?.toISOString() ?? null}
               sessions={sessions.map((s) => ({
                 id: s.id,
                 title: s.title,
                 dayKey: kstDayKey(s.date),
                 time: formatTime(s.date),
+                startsAt: s.date.toISOString(),
                 remaining: s.remaining,
                 total: s.total,
               }))}
@@ -94,7 +98,10 @@ export default async function ShowPage() {
         </aside>
       </div>
 
-      <MobileBookingBar soldOut={sessions.every((s) => s.remaining === 0)} />
+      <MobileBookingBar
+        salesOpenAt={show.salesOpenAt?.toISOString() ?? null}
+        sessions={sessions.map((s) => ({ startsAt: s.date.toISOString(), remaining: s.remaining }))}
+      />
     </main>
   );
 }

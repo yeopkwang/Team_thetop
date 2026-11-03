@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth-helpers";
 import { HttpError, errorResponse } from "@/lib/http";
 import { CLOSED_STATUSES, SEAT_HOLDING_STATUSES } from "@/lib/reservations";
+import { formatSessionDate } from "@/lib/format";
 
 export async function POST(req: Request) {
   try {
@@ -34,9 +35,13 @@ export async function POST(req: Request) {
 
       const showSession = await tx.showSession.findUniqueOrThrow({
         where: { id: sessionId },
-        include: { show: { select: { status: true } } },
+        include: { show: { select: { status: true, salesOpenAt: true } } },
       });
       if (showSession.show.status !== ShowStatus.ON_SALE) throw new HttpError(400, "지금 예매 중인 공연이 아닙니다.");
+      if (showSession.show.salesOpenAt && showSession.show.salesOpenAt > new Date()) {
+        throw new HttpError(400, `아직 티켓 오픈 전이에요. ${formatSessionDate(showSession.show.salesOpenAt)}에 열려요.`);
+      }
+      if (showSession.date <= new Date()) throw new HttpError(400, "이미 시작한 회차는 예매할 수 없어요.");
 
       const alreadyBooked = await tx.reservation.findFirst({
         where: { userId: session.user.id, sessionId, status: { notIn: CLOSED_STATUSES } },
