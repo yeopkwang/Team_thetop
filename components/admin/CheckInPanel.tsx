@@ -40,7 +40,8 @@ const SEARCH_LIMIT = 8;
 // 입장 확인: 카메라로 관객의 QR을 찍는다. QR이 안 되면(휴대폰이 꺼졌거나 화면이 깨졌을 때) 이름·예매번호로 찾아 누른다.
 export default function CheckInPanel() {
   const [query, setQuery] = useState("");
-  const [tickets, setTickets] = useState<TicketRow[] | null>(null);
+  // undefined: 불러오는 중, null: 못 불러옴
+  const [tickets, setTickets] = useState<TicketRow[] | null | undefined>(undefined);
   const [outcome, setOutcome] = useState<ScanOutcome | null>(null);
   const [scannerOn, setScannerOn] = useState(false);
   const [cameraMessage, setCameraMessage] = useState("");
@@ -54,6 +55,7 @@ export default function CheckInPanel() {
       setTickets(data.tickets);
     } catch {
       // 명단을 못 받아도 QR 입장 확인은 쓸 수 있다
+      setTickets((prev) => prev ?? null);
     }
   };
 
@@ -116,7 +118,7 @@ export default function CheckInPanel() {
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraMessage("이 브라우저는 카메라를 지원하지 않아요. 아래에 QR 토큰을 직접 입력해 주세요.");
+      setCameraMessage("이 브라우저는 카메라를 지원하지 않아요. 아래 칸에 이름이나 예매번호를 적어 찾아 주세요.");
       return;
     }
 
@@ -229,8 +231,9 @@ export default function CheckInPanel() {
         />
         {query.trim() && (
           <ul className="mt-2 divide-y divide-line rounded-lg border border-line">
+            {tickets === undefined && <li className="px-4 py-3 text-meta text-ink-3">명단을 불러오는 중이에요.</li>}
             {tickets === null && <li className="px-4 py-3 text-meta text-ink-3">명단을 불러오지 못했어요. 새로고침해 주세요.</li>}
-            {tickets !== null && matches.length === 0 && (
+            {tickets && matches.length === 0 && (
               <li className="px-4 py-3 text-meta text-ink-3">입금이 확인된 관객 중에 없어요. 입금 확인 목록이나 예매자 목록을 확인해 주세요.</li>
             )}
             {matches.slice(0, SEARCH_LIMIT).map((t) => (

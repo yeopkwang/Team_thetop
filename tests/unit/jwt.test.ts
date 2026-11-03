@@ -52,3 +52,13 @@ describe("로그인 토큰", () => {
     expect(() => createToken("u")).toThrow(/JWT_SECRET/);
   });
 });
+
+describe("발급 시각", () => {
+  it("토큰에 발급 시각(iat, 초)을 담는다. 비밀번호를 바꾸기 전에 받은 토큰을 가려낼 때 쓴다", () => {
+    process.env.JWT_SECRET = SECRET;
+    const before = Math.floor(Date.now() / 1000);
+    const payload = verifyToken(createToken("u1", 60))!;
+    expect(payload.iat).toBeGreaterThanOrEqual(before);
+    expect(payload.exp - payload.iat!).toBe(60);
+  });
+});

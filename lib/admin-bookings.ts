@@ -2,7 +2,7 @@
 import { randomUUID } from "crypto";
 import { Prisma, RefundStatus, ReservationStatus, ShowStatus, TicketStatus } from "@prisma/client";
 import { logAudit } from "./audit";
-import { maskAccount } from "./format";
+import { audienceName, maskAccount } from "./format";
 import { HttpError } from "./http";
 import { prisma } from "./prisma";
 import { CLOSED_STATUSES, QUEUED_TX, expireOverdue, lockReservation, lockSession, seatsHeld } from "./reservations";
@@ -130,7 +130,7 @@ export async function checkIn(by: { qrToken?: string; bookingId?: string }, acto
     return {
       checkedInAt: created.createdAt,
       bookingId: reservation.id,
-      name: reservation.depositorName || reservation.user.name || "관객",
+      name: audienceName(reservation.depositorName, reservation.user.name),
       kakaoName: reservation.user.name,
       showTitle: reservation.session.show.title,
     };
@@ -289,7 +289,7 @@ export async function listRefunds() {
     status: r.status,
     createdAt: r.createdAt,
     bookingId: r.reservation.id,
-    name: r.reservation.depositorName || r.reservation.user.name || "이름 없음",
+    name: audienceName(r.reservation.depositorName, r.reservation.user.name),
     showTitle: r.reservation.session.show.title,
     bank: r.refundBank,
     account: r.refundAccount,
@@ -307,7 +307,7 @@ export async function listCheckInTickets() {
   return rows
     .map((r) => ({
       bookingId: r.id,
-      name: r.depositorName || r.user.name || "이름 없음",
+      name: audienceName(r.depositorName, r.user.name),
       kakaoName: r.user.name,
       checkedInAt: r.ticket?.checkIn?.createdAt ?? null,
     }))

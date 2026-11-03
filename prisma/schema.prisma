@@ -211,10 +211,13 @@ model AuditLog {
 }
 
 model Credential {
-  id           String @id @default(cuid())
-  userId       String @unique
-  username     String @unique
-  passwordHash String
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  // 소문자로 저장한다(로그인할 때도 소문자로 바꿔 찾는다).
+  username          String    @unique
+  passwordHash      String
+  // 비밀번호를 마지막으로 바꾼 때. 그 전에 받은 로그인 토큰은 더 쓰지 못한다.
+  passwordChangedAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

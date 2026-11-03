@@ -53,7 +53,8 @@ async function seedRoles() {
 
 // 관리자 계정은 환경변수로만 만든다. 비밀번호를 코드에 적으면 공개 레포에 그대로 남는다.
 async function seedAdmin() {
-  const username = process.env.SEED_ADMIN_USERNAME?.trim();
+  // 로그인할 때 아이디를 소문자로 바꿔 찾으므로 소문자로 저장한다.
+  const username = process.env.SEED_ADMIN_USERNAME?.trim().toLowerCase();
   const password = process.env.SEED_ADMIN_PASSWORD;
   if (!username || !password) {
     console.log("SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD가 없어서 관리자 계정은 건너뜁니다.");

@@ -114,6 +114,12 @@ describe("새 입력: 환불 계좌 · 입금자명 · 입장 · 계정", () => 
     expect(refundInput.parse(ok)).toEqual({ reservationId: "r1", bank: "카카오뱅크", account: "333301-234567", holder: "홍길동" });
     expect(refundInput.safeParse({ ...ok, account: "3333-01-23456a" }).error?.issues[0].message).toBe("계좌번호는 숫자와 -만 적어 주세요.");
   });
+  it("환불 계좌: -를 끝없이 붙여도 40자에서 자른다", () => {
+    expect(refundInput.safeParse({ ...ok, account: "123456" + "-".repeat(35) }).success).toBe(false);
+  });
+  it("로그인 아이디는 소문자로 바꿔 찾는다", () => {
+    expect(loginInput.parse({ id: " Door.Staff ", password: "x" }).id).toBe("door.staff");
+  });
   it("환불 계좌: 숫자 6~20자리(경계값)", () => {
     expect(refundInput.safeParse({ ...ok, account: "12345" }).success).toBe(false);
     expect(refundInput.safeParse({ ...ok, account: "123-456" }).success).toBe(true);

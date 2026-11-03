@@ -13,7 +13,8 @@ export const GET = route(async (req) => {
   const list = await attendeeList(searchParams.get("show") || undefined);
   if (searchParams.get("format") !== "csv") return NextResponse.json(list);
 
-  const filename = encodeURIComponent(`${list.show.title} 예매자 명단.csv`);
+  // RFC 8187: encodeURIComponent가 남기는 ' ( ) * ! 까지 %로 바꾼다.
+  const filename = encodeURIComponent(`${list.show.title} 예매자 명단.csv`).replace(/['()*!]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
   return new Response(toCsv(attendeeTable(list.people)), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import CopyButton from "@/components/CopyButton";
 import StatusBadge from "@/components/StatusBadge";
 import { apiFetch, errorMessage, readAdminCache, writeAdminCache } from "@/lib/api-client";
 import { bookingNumber, formatDateTime } from "@/lib/format";
@@ -23,7 +24,6 @@ export default function AdminRefundsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
-  const [copied, setCopied] = useState<string | null>(null);
 
   const load = async () => {
     try {
@@ -68,16 +68,6 @@ export default function AdminRefundsPage() {
     }
   };
 
-  const copyAccount = async (item: RefundItem) => {
-    try {
-      await navigator.clipboard.writeText(item.account.replace(/[^0-9]/g, ""));
-      setCopied(item.id);
-      window.setTimeout(() => setCopied(null), 2000);
-    } catch {
-      setMessage("복사하지 못했어요. 계좌번호를 직접 옮겨 적어 주세요.");
-    }
-  };
-
   const waiting = items.filter((r) => r.status !== "REFUNDED").length;
 
   return (
@@ -119,15 +109,7 @@ export default function AdminRefundsPage() {
                     <span className={r.status === "REFUNDED" ? "text-ink-3" : "font-semibold"}>
                       {r.bank} {r.account} ({r.holder})
                     </span>
-                    {r.status !== "REFUNDED" && (
-                      <button
-                        type="button"
-                        onClick={() => void copyAccount(r)}
-                        className="h-7 rounded border border-line-strong bg-white px-2 text-cap font-semibold text-ink-2 hover:text-ink"
-                      >
-                        {copied === r.id ? "복사됨" : "계좌 복사"}
-                      </button>
-                    )}
+                    {r.status !== "REFUNDED" && <CopyButton value={r.account} label="계좌 복사" />}
                   </p>
                 ) : (
                   r.status !== "REFUNDED" && <p className="mt-1.5 text-meta text-wait-700">계좌가 적혀 있지 않아요. 관객에게 따로 받아 주세요.</p>

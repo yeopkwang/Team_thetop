@@ -35,6 +35,11 @@ export function bookingNumber(id: string) {
   return id.slice(-8).toUpperCase();
 }
 
+// 관객을 부르는 이름: 입금자명(실명)이 있으면 그것, 없으면 카카오 이름.
+export function audienceName(depositorName: string, kakaoName: string | null | undefined) {
+  return depositorName || kakaoName || "이름 없음";
+}
+
 // 계좌번호를 끝 네 자리만 남기고 가린다. 123-456-7890 → ****7890
 export function maskAccount(account: string) {
   const digits = account.replace(/[^0-9]/g, "");

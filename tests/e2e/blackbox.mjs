@@ -84,6 +84,7 @@ check("운영진 토큰은 12시간짜리(관객 7일보다 짧게)", Math.abs(e
 const wrongPw = await api("/auth/login", { method: "POST", body: { id: "admin", password: "wrong-password" } });
 const noUser = await api("/auth/login", { method: "POST", body: { id: "nobody", password: "wrong-password" } });
 check("틀린 비밀번호와 없는 아이디는 같은 401 문구(아이디가 있는지 알려 주지 않는다)", wrongPw.status === 401 && noUser.status === 401 && wrongPw.data.error === noUser.data.error);
+check("아이디는 대소문자를 가리지 않는다(휴대폰 키보드가 첫 글자를 대문자로 바꿔도)", (await api("/auth/login", { method: "POST", body: { id: " Admin ", password: process.env.SEED_ADMIN_PASSWORD } })).status === 200);
 check("아이디·비밀번호 빈칸은 400", (await api("/auth/login", { method: "POST", body: { id: " ", password: "" } })).status === 400);
 check("로그인에 깨진 JSON은 400(500이 아니라)", (await api("/auth/login", { method: "POST", raw: "{" })).status === 400);
 
@@ -575,12 +576,25 @@ check(
 // ======================================================================
 section("P. 운영진 계정 (만들기 · 스태프 권한 · 비밀번호 · 로그인 잠금 · 지우기)");
 const makeAccount = (body, t = admin) => api("/admin/accounts", { token: t, method: "POST", body: { name: "입구 스태프", password: "staff-pass-1234", role: "STAFF", ...body } });
+// place를 주면 그 IP에서 온 요청처럼 보낸다(Vercel은 x-forwarded-for를 실제 접속 주소로 덮어쓴다).
+const loginAs = async (id, password, place) => {
+  const res = await fetch(BASE + "/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(place ? { "x-forwarded-for": place } : {}) },
+    body: JSON.stringify({ id, password }),
+  });
+  const data = await res.json().catch(() => null);
+  if (res.status >= 400 && data?.error) errorMessages.push(`${res.status} /auth/login: ${data.error}`);
+  return { status: res.status, data };
+};
+const failuresOf = (username) => prisma.auditLog.count({ where: { action: "LOGIN_FAILED", entityId: username } });
+
 check("스태프 계정 만들기(아이디는 소문자로 저장)", (await makeAccount({ username: "Door.Staff" })).status === 200);
 check("같은 아이디 → 409", (await makeAccount({ username: "door.staff" })).status === 409);
 check("임시 비밀번호 9자 → 400 · 관리자 아닌 권한 → 400", (await makeAccount({ username: "short", password: "123456789" })).status === 400 && (await makeAccount({ username: "super", role: "SUPER_ADMIN" })).status === 400);
-const staffLogin = await api("/auth/login", { method: "POST", body: { id: "door.staff", password: "staff-pass-1234" } });
-check("스태프 로그인 → 토큰, 역할 STAFF", staffLogin.status === 200 && staffLogin.data.user.roles.join() === "STAFF", staffLogin.data?.error);
-const staff = staffLogin.data.token;
+const staffLogin = await loginAs("Door.Staff", "staff-pass-1234");
+check("스태프 로그인(아이디 대소문자 상관없음) → 토큰, 역할 STAFF", staffLogin.status === 200 && staffLogin.data.user.roles.join() === "STAFF", staffLogin.data?.error);
+let staff = staffLogin.data.token;
 for (const [label, path, expected] of [
   ["입금 확인 목록", "/admin/bookings/pending", 200],
   ["입장 명단", "/admin/checkin", 200],
@@ -601,11 +615,18 @@ const changePw = (t, current, next) => api("/auth/password", { token: t, method:
 check("내 비밀번호 바꾸기: 지금 비밀번호가 틀리면 400", (await changePw(staff, "wrong-password", "staff-new-pass-5678")).status === 400);
 check("내 비밀번호 바꾸기: 같은 비밀번호로는 400", (await changePw(staff, "staff-pass-1234", "staff-pass-1234")).status === 400);
 check("관객은 비밀번호를 바꿀 곳이 없다(403)", (await changePw(audience.token, "x", "0123456789")).status === 403);
+// 토큰 발급 시각은 초 단위라, 같은 1초 안에 받은 토큰은 끊기지 않는다. 시험에서는 1초를 넘겨 바꾼다.
+const nextSecond = () => new Promise((r) => setTimeout(r, 1100));
+await nextSecond();
 const changed = await changePw(staff, "staff-pass-1234", "staff-new-pass-5678");
-const loginAs = (id, password) => api("/auth/login", { method: "POST", body: { id, password } });
+check(
+  "비밀번호를 바꾸면 전에 받은 토큰은 끊기고(401), 바꾼 기기는 새 토큰으로 이어진다",
+  changed.status === 200 && (await api("/admin/bookings/pending", { token: staff })).status === 401 && (await api("/admin/bookings/pending", { token: changed.data.token })).status === 200
+);
+staff = changed.data.token;
 check(
   "비밀번호를 바꾸면 새 비밀번호로만 로그인",
-  changed.status === 200 && (await loginAs("door.staff", "staff-pass-1234")).status === 401 && (await loginAs("door.staff", "staff-new-pass-5678")).status === 200
+  (await loginAs("door.staff", "staff-pass-1234")).status === 401 && (await loginAs("door.staff", "staff-new-pass-5678")).status === 200
 );
 
 const accounts = (await api("/admin/accounts", { token: admin })).data.accounts;
@@ -614,25 +635,49 @@ check(
   "계정 목록: 아이디·이름·권한, 내 계정 표시, 비밀번호는 내려주지 않는다",
   staffAccount?.role === "STAFF" && staffAccount?.name === "입구 스태프" && accounts.find((a) => a.isMe)?.username === "admin" && !JSON.stringify(accounts).includes("passwordHash") && !accounts.some((a) => a.username === "audience-pw" && a.role)
 );
+await nextSecond();
 const reset = await api(`/admin/accounts/${staffAccount.id}/password`, { token: admin, method: "POST", body: { password: "reset-pass-0000" } });
-check("관리자가 비밀번호를 새로 정해 주면 그걸로 로그인", reset.status === 200 && (await loginAs("door.staff", "reset-pass-0000")).status === 200);
+check(
+  "관리자가 비밀번호를 새로 정해 주면 그 사람이 받아 둔 로그인은 끊기고, 새 비밀번호로 로그인된다",
+  reset.status === 200 && (await api("/admin/bookings/pending", { token: staff })).status === 401 && (await loginAs("door.staff", "reset-pass-0000")).status === 200
+);
 
-// 앞에서 틀린 횟수(바꾸기 전 비밀번호로 시도한 1번)까지 합쳐 15분 안에 10번이면 막힌다.
-const priorFails = await prisma.auditLog.count({ where: { action: "LOGIN_FAILED", entityId: "door.staff" } });
+// 로그인 잠금: 같은 곳(IP)에서 10번(앞에서 틀린 횟수 포함) 틀리면 그곳에서만 막힌다.
+const priorFails = await failuresOf("door.staff");
 const fails = [];
 for (let i = priorFails; i < 10; i++) fails.push((await loginAs("door.staff", `wrong-${i}`)).status);
 const locked = await loginAs("door.staff", "reset-pass-0000");
-check("같은 아이디로 10번 틀리면 맞는 비밀번호도 막힌다(429, 기다릴 시간 안내)", fails.every((s) => s === 401) && locked.status === 429 && locked.data.error.includes("15분"), `${fails.join()} → ${locked.status}`);
+check("같은 곳에서 10번 틀리면 맞는 비밀번호도 막힌다(429, 기다릴 시간 안내)", fails.every((s) => s === 401) && locked.status === 429 && locked.data.error.includes("15분"), `${fails.join()} → ${locked.status}`);
+const elsewhere = await loginAs("door.staff", "reset-pass-0000", "203.0.113.7");
+check("다른 곳(공연장 휴대폰)에서는 같은 아이디로 로그인된다(남이 일부러 틀려 막는 것 방지)", elsewhere.status === 200, elsewhere.data?.error);
 check("다른 아이디 로그인은 영향 없다", (await loginAs("admin", process.env.SEED_ADMIN_PASSWORD)).status === 200);
+const before = await failuresOf("no-such-staff");
+check("없는 아이디로 틀리면 기록하지 않는다(아이디 칸에 비밀번호를 잘못 친 경우)", (await loginAs("no-such-staff", "x")).status === 401 && (await failuresOf("no-such-staff")) === before && before === 0);
+
+// 동시에 몰아서 보내도 10번까지만 시도된다(세고 → 기록하는 사이에 끼어들지 못한다).
+await makeAccount({ username: "race.staff", password: "race-pass-1234" });
+const burst = await Promise.all(Array.from({ length: 25 }, (_, i) => loginAs("race.staff", `burst-${i}`, "198.51.100.1")));
+const raceFails = await failuresOf("race.staff");
+check(
+  "같은 곳에서 동시에 25번 틀려도 실제로 시도되는 건 10번(나머지는 막힘)",
+  raceFails === 10 && burst.filter((r) => r.status === 401).length === 10 && burst.every((r) => [401, 429, 503].includes(r.status)),
+  `기록 ${raceFails}, ${statuses(burst)}`
+);
 
 check("내 계정은 지울 수 없다(400)", (await api(`/admin/accounts/${adminUserId}`, { token: admin, method: "DELETE" })).status === 400);
 check("없는 계정 → 404", (await api("/admin/accounts/nope", { token: admin, method: "DELETE" })).status === 404);
 const deleted = await api(`/admin/accounts/${staffAccount.id}`, { token: admin, method: "DELETE" });
 check(
-  "지운 계정은 남은 토큰도 바로 막히고(403) 로그인도 안 된다",
-  deleted.status === 200 && (await api("/admin/bookings/pending", { token: staff })).status === 403 && (await prisma.credential.count({ where: { username: "door.staff" } })) === 0
+  "지운 계정은 남은 토큰도 바로 막히고(403) 아이디도 없어진다",
+  deleted.status === 200 && (await api("/admin/bookings/pending", { token: elsewhere.data.token })).status === 403 && (await prisma.credential.count({ where: { username: "door.staff" } })) === 0
 );
-check("지운 아이디로 다시 만들 수 있다", (await makeAccount({ username: "door.staff", password: "again-pass-1234" })).status === 200);
+const recreated = await makeAccount({ username: "door.staff", name: "새 입구 담당", password: "again-pass-1234" });
+const oldLogs = (await api("/admin/logs?kind=booking", { token: admin })).data.logs;
+check(
+  "지운 아이디로 다시 만들면 새 사람으로 만든다(예전 기록은 '지운 계정'으로 남고 새 이름이 붙지 않는다)",
+  recreated.status === 200 && recreated.data.id !== staffAccount.id && !oldLogs.some((l) => l.actor.includes("새 입구 담당"))
+);
+check("작업 기록: 지운 계정이 한 일은 '(지운 계정)'으로 보인다", (await api("/admin/logs?kind=account", { token: admin })).data.logs.some((l) => l.actor === "입구 스태프 (지운 계정)"));
 
 // 마지막 관리자 지키기: 관리자 둘만 남은 상태에서 서로를 동시에 지워도 한 명은 남는다.
 await makeAccount({ username: "admin-two", role: "ADMIN", password: "admin-two-pass" });
@@ -647,7 +692,11 @@ const mutual = await Promise.all([
 const adminsLeft = await prisma.credential.count({ where: { username: { in: ["admin-two", "admin-three"] } } });
 await prisma.userRole.update({ where: { id: mainRole.id }, data: { expiresAt: null } });
 // 늦게 온 쪽은 이미 지워져 권한 확인에서 403이 나거나, 잠금 뒤 '마지막 관리자'로 400이 난다. 어느 쪽이든 한 명은 남아야 한다.
-check("관리자 둘이 서로를 동시에 지우면 하나만 성공, 마지막 관리자는 남는다", mutual.filter((r) => r.status === 200).length === 1 && ["400", "403"].includes(String(mutual.find((r) => r.status !== 200)?.status)) && adminsLeft === 1, statuses(mutual));
+check(
+  "관리자 둘이 서로를 동시에 지우면 하나만 성공, 마지막 관리자는 남는다",
+  mutual.filter((r) => r.status === 200).length === 1 && ["400", "403"].includes(String(mutual.find((r) => r.status !== 200)?.status)) && adminsLeft === 1,
+  statuses(mutual)
+);
 const survivor = (await api("/admin/accounts", { token: admin })).data.accounts.find((a) => ["admin-two", "admin-three"].includes(a.username));
 await api(`/admin/accounts/${survivor.id}`, { token: admin, method: "DELETE" });
 
@@ -657,7 +706,7 @@ check(
   ["운영진 계정 만듦", "비밀번호를 새로 정해 줌", "내 비밀번호 바꿈", "운영진 계정 지움", "로그인 실패"].every((a) => accountLogs.some((l) => l.action === a)) &&
     accountLogs.every((l) => !["입금 확인", "공연 수정"].includes(l.action))
 );
-check("로그인 실패 기록에는 적은 아이디가 남는다(비밀번호는 남지 않는다)", accountLogs.some((l) => l.action === "로그인 실패" && l.target === "door.staff") && !JSON.stringify(accountLogs).includes("wrong-3"));
+check("로그인 실패 기록에는 있는 아이디만, 비밀번호는 남지 않는다", accountLogs.some((l) => l.action === "로그인 실패" && l.target === "door.staff") && !JSON.stringify(accountLogs).includes("wrong-3") && !JSON.stringify(accountLogs).includes("no-such-staff"));
 
 // ======================================================================
 section("L. 화면 (블랙박스: 사용자가 받는 HTML)");

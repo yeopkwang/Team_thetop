@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import FilterChips from "@/components/admin/FilterChips";
 import { apiFetch, errorMessage } from "@/lib/api-client";
 import { LOG_KINDS, type LogKind } from "@/lib/log-kinds";
 
@@ -47,23 +48,8 @@ export default function AdminLogsPage() {
       <h2 className="text-lead font-bold">작업 기록</h2>
       <p className="mt-1 text-meta text-ink-3">입금 확인, 취소, 환불, 입장, 공연 수정, 계정 변경을 누가 언제 했는지 남아요. 지울 수 없어요.</p>
 
-      <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 md:mx-0 md:px-0" role="group" aria-label="종류로 거르기">
-        {FILTERS.map((f) => {
-          const on = f.id === kind;
-          return (
-            <button
-              key={f.id}
-              type="button"
-              aria-pressed={on}
-              onClick={() => setKind(f.id)}
-              className={`h-9 shrink-0 rounded-full border px-3.5 text-meta font-semibold ${
-                on ? "border-ink bg-ink text-white" : "border-line-strong bg-white text-ink-2 hover:border-ink-3"
-              }`}
-            >
-              {f.label}
-            </button>
-          );
-        })}
+      <div className="mt-4">
+        <FilterChips label="종류로 거르기" items={FILTERS} value={kind} onChange={setKind} />
       </div>
 
       {message && <p className="mt-4 rounded-md bg-surface px-4 py-3 text-meta text-ink-2">{message}</p>}

@@ -12,6 +12,6 @@ export const GET = route(async (req) => {
   const { searchParams } = new URL(req.url);
   const kind = searchParams.get("kind");
   return NextResponse.json(
-    await listAuditLogs(kind && kind in LOG_KINDS ? (kind as LogKind) : undefined, searchParams.get("cursor") || undefined)
+    await listAuditLogs(kind && Object.hasOwn(LOG_KINDS, kind) ? (kind as LogKind) : undefined, searchParams.get("cursor") || undefined)
   );
 });

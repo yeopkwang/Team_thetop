@@ -1,7 +1,7 @@
+import { mapLinks } from "@/lib/maps";
+
 // 장소정보 탭: 공연장 이름과 주소, 지도 앱 바로가기.
 export default function VenueInfo({ venue, address }: { venue: string; address: string }) {
-  const query = encodeURIComponent(address || venue);
-
   return (
     <div>
       <table className="w-full border-t border-ink text-left text-ui">
@@ -24,12 +24,11 @@ export default function VenueInfo({ venue, address }: { venue: string; address: 
       </table>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <a href={`https://map.kakao.com/?q=${query}`} target="_blank" rel="noreferrer" className="btn-secondary btn-sm">
-          카카오맵에서 보기
-        </a>
-        <a href={`https://map.naver.com/p/search/${query}`} target="_blank" rel="noreferrer" className="btn-secondary btn-sm">
-          네이버 지도에서 보기
-        </a>
+        {mapLinks(address || venue).map((m) => (
+          <a key={m.name} href={m.href} target="_blank" rel="noreferrer" className="btn-secondary btn-sm">
+            {m.name}에서 보기
+          </a>
+        ))}
       </div>
     </div>
   );

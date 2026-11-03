@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import Link from "next/link";
+import QuestionList from "@/components/QuestionList";
 import { faqItems } from "@/lib/faq";
 import { getCurrentShow } from "@/lib/show";
 
@@ -16,22 +17,8 @@ export default async function HelpPage() {
         <h1 className="text-h1 font-bold">자주 묻는 질문</h1>
         <p className="mt-2 text-ui text-ink-3">예매, 입금, 환불, 입장에 대해 많이 묻는 것을 모았어요.</p>
 
-        <div className="mt-8 divide-y divide-line border-y border-line">
-          {items.map((item) => (
-            <details key={item.q} className="group">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-[15px] font-semibold [&::-webkit-details-marker]:hidden">
-                {item.q}
-                <span aria-hidden className="shrink-0 text-ink-4 transition-transform group-open:rotate-45">
-                  +
-                </span>
-              </summary>
-              <div className="space-y-2 pb-5 text-ui leading-[1.8] text-ink-2">
-                {item.a.map((line) => (
-                  <p key={line}>{line}</p>
-                ))}
-              </div>
-            </details>
-          ))}
+        <div className="mt-8">
+          <QuestionList items={items} />
         </div>
 
         <div className="mt-8 flex flex-wrap gap-2">

@@ -28,6 +28,7 @@ export const refundInput = z.object({
   bank: oneLine(20, "환불받을 은행을 적어 주세요."),
   account: z
     .string({ required_error: "환불받을 계좌번호를 적어 주세요.", invalid_type_error: "환불받을 계좌번호를 적어 주세요." })
+    .max(40, "계좌번호 자릿수를 확인해 주세요.")
     .transform((v) => v.replace(/\s+/g, ""))
     .pipe(
       z
@@ -65,8 +66,9 @@ export const checkInInput = z
   })
   .refine((v) => Boolean(v.qrToken || v.bookingId), { message: "QR을 찍거나 관객을 골라 주세요." });
 
+// 아이디는 소문자로 저장하므로 소문자로 바꿔 찾는다(휴대폰 키보드가 첫 글자를 대문자로 바꿔도 로그인되게).
 export const loginInput = z.object({
-  id: z.string({ required_error: "아이디와 비밀번호를 적어 주세요." }).trim().min(1, "아이디와 비밀번호를 적어 주세요.").max(100),
+  id: z.string({ required_error: "아이디와 비밀번호를 적어 주세요." }).trim().toLowerCase().min(1, "아이디와 비밀번호를 적어 주세요.").max(100),
   password: z.string({ required_error: "아이디와 비밀번호를 적어 주세요." }).min(1, "아이디와 비밀번호를 적어 주세요.").max(200),
 });
 

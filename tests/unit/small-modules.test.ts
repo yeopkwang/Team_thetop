@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { menuItemFor } from "@/components/admin/StaffLevel";
 import { parseCredits, performerNames } from "@/lib/credits";
-import { maskAccount } from "@/lib/format";
+import { audienceName, maskAccount } from "@/lib/format";
 import { LOGIN_ERRORS, loginErrorMessage } from "@/lib/login-errors";
 import { paymentDeadline } from "@/lib/reservations";
 import { staffLevel } from "@/lib/roles";
@@ -98,5 +98,13 @@ describe("계좌번호 가리기", () => {
     expect(maskAccount("123")).toBe("****123");
     expect(maskAccount("")).toBe("");
     expect(maskAccount("****4567")).toBe("****4567");
+  });
+});
+
+describe("관객 이름", () => {
+  it("입금자명(실명) → 카카오 이름 → '이름 없음' 순서", () => {
+    expect(audienceName("김민지", "민지카톡")).toBe("김민지");
+    expect(audienceName("", "민지카톡")).toBe("민지카톡");
+    expect(audienceName("", null)).toBe("이름 없음");
   });
 });

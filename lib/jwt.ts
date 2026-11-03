@@ -3,6 +3,8 @@ import { createHmac, timingSafeEqual } from "crypto";
 type TokenPayload = {
   userId: string;
   exp: number;
+  // 발급 시각(초). 비밀번호를 바꾸기 전에 받은 토큰을 끊을 때 본다. 예전 토큰에는 없다.
+  iat?: number;
 };
 
 // 기본값을 두지 않는다. 공개 레포에 적힌 값으로 서명하면 누구나 관리자 토큰을 만들 수 있다.
@@ -39,10 +41,8 @@ function sign(input: string) {
 
 export function createToken(userId: string, expiresInSeconds = 60 * 60 * 24 * 7) {
   const header = base64UrlEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const payload: TokenPayload = {
-    userId,
-    exp: Math.floor(Date.now() / 1000) + expiresInSeconds,
-  };
+  const now = Math.floor(Date.now() / 1000);
+  const payload: TokenPayload = { userId, iat: now, exp: now + expiresInSeconds };
   const payloadPart = base64UrlEncode(JSON.stringify(payload));
   const unsigned = `${header}.${payloadPart}`;
   const signature = sign(unsigned);

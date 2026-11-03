@@ -1,18 +1,15 @@
 // 관리자용 집계와 명단: 첫 화면의 판매 현황, 예매자 명단(엑셀·인쇄).
 import { ReservationStatus, ShowStatus } from "@prisma/client";
-import { bookingNumber, formatDateTime } from "./format";
+import { audienceName, bookingNumber, formatDateTime } from "./format";
 import { HttpError } from "./http";
 import { prisma } from "./prisma";
 import { expireOverdue } from "./reservations";
+import { getCurrentShow } from "./show";
 import { reservationStatus } from "./status";
 
 // 판매 중인 공연의 현황. 판매 중인 공연이 없으면 null.
 export async function salesSummary() {
-  const show = await prisma.show.findFirst({
-    where: { status: ShowStatus.ON_SALE },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, title: true, price: true, salesOpenAt: true, sessions: { select: { id: true, date: true, totalCapacity: true } } },
-  });
+  const show = await getCurrentShow();
   if (!show) return null;
 
   const sessionIds = show.sessions.map((s) => s.id);
@@ -69,7 +66,7 @@ export async function attendeeList(showId?: string) {
       id: r.id,
       number: bookingNumber(r.id),
       status: r.status,
-      name: r.depositorName || r.user.name || "이름 없음",
+      name: audienceName(r.depositorName, r.user.name),
       kakaoName: r.user.name || "",
       performer: r.preferredPerformerName,
       cancelReason: r.cancelReason,

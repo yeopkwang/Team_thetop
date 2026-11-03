@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { apiFetch, errorMessage } from "@/lib/api-client";
 import { formatSessionDate, won } from "@/lib/format";
-import { CheckIcon, CopyIcon } from "../icons";
+import CopyButton from "../CopyButton";
 
 type Props = {
   show: { price: number; paymentBank: string; paymentAccount: string; paymentHolder: string };
@@ -14,21 +14,10 @@ type Props = {
 
 // 마이 티켓의 입금 안내: 계좌(복사 버튼), 예금주, 입금자명(고치기), 금액, 입금 기한.
 export default function PaymentGuide({ show, booking, onChanged }: Props) {
-  const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(booking.depositorName);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(show.paymentAccount.replace(/[^0-9]/g, "") || show.paymentAccount);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
-  };
 
   const saveName = async () => {
     setSaving(true);
@@ -55,14 +44,7 @@ export default function PaymentGuide({ show, booking, onChanged }: Props) {
             <span>
               {show.paymentBank} {show.paymentAccount}
             </span>
-            <button
-              type="button"
-              onClick={copy}
-              className="inline-flex h-8 items-center gap-1 rounded border border-line-strong bg-white px-2 text-cap font-semibold text-ink-2 hover:text-ink"
-            >
-              {copied ? <CheckIcon className="h-3.5 w-3.5" /> : <CopyIcon className="h-3.5 w-3.5" />}
-              {copied ? "복사됨" : "복사"}
-            </button>
+            <CopyButton value={show.paymentAccount} />
           </dd>
         </div>
         <div className="flex justify-between gap-3">

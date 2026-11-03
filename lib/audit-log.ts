@@ -1,6 +1,6 @@
 // 관리자 > 작업 기록: AuditLog를 사람이 읽는 문장으로 바꿔 최근 것부터 보여 준다.
 import type { AuditLog, Prisma } from "@prisma/client";
-import { bookingNumber, formatSessionDate } from "./format";
+import { audienceName, bookingNumber, formatSessionDate } from "./format";
 import type { LogKind } from "./log-kinds";
 import { prisma } from "./prisma";
 import { ROLE_INFO } from "./roles";
@@ -61,7 +61,7 @@ async function targetNames(logs: AuditLog[]) {
     prisma.credential.findMany({ where: { userId: { in: ids("User") } }, select: { userId: true, username: true } }),
   ]);
   const names = new Map<string, string>();
-  for (const r of reservations) names.set(r.id, `${r.depositorName || r.user.name || "관객"} (예매번호 ${bookingNumber(r.id)})`);
+  for (const r of reservations) names.set(r.id, `${audienceName(r.depositorName, r.user.name)} (예매번호 ${bookingNumber(r.id)})`);
   for (const s of shows) names.set(s.id, s.title);
   for (const c of credentials) names.set(c.userId, c.username);
   return names;
@@ -76,6 +76,14 @@ function targetOf(log: AuditLog, names: Map<string, string>) {
   return text(before?.title) || text(before?.username) || text(after?.username) || (log.entityType === "Asset" ? "이미지" : "");
 }
 
+// 운영진은 '이름 (아이디)', 관객은 카카오 이름, 지운 운영진 계정은 '이름 (지운 계정)', 사람이 아닌 기록(로그인 실패)은 빈칸.
+function actorName(actor: { name: string | null; kakaoId: string | null; credential: { username: string } | null } | null) {
+  if (!actor) return "";
+  if (actor.credential) return `${actor.name || actor.credential.username} (${actor.credential.username})`;
+  if (actor.kakaoId) return actor.name || "관객";
+  return `${actor.name || "운영진"} (지운 계정)`;
+}
+
 const PAGE = 50;
 
 // 최근 기록부터 50개씩. kind로 종류를 거른다. cursor는 앞 페이지 마지막 기록의 id.
@@ -87,7 +95,7 @@ export async function listAuditLogs(kind?: LogKind, cursor?: string) {
     take: PAGE + 1,
     ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    include: { actorUser: { select: { name: true, credential: { select: { username: true } } } } },
+    include: { actorUser: { select: { name: true, kakaoId: true, credential: { select: { username: true } } } } },
   });
   const page = rows.slice(0, PAGE);
   const names = await targetNames(page);
@@ -102,8 +110,7 @@ export async function listAuditLogs(kind?: LogKind, cursor?: string) {
         atText: formatSessionDate(log.createdAt),
         action: info?.label ?? log.action,
         kind: info?.kind ?? null,
-        // 운영진은 '이름(아이디)', 관객은 카카오 이름, 사람이 아닌 기록(로그인 실패)은 빈칸
-        actor: actor ? (actor.credential ? `${actor.name || actor.credential.username} (${actor.credential.username})` : actor.name || "관객") : "",
+        actor: actorName(actor),
         target: targetOf(log, names),
         detail: info?.detail?.(log.beforeJson as Json, log.afterJson as Json) ?? "",
       };

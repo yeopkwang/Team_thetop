@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { apiDownload, apiFetch, errorMessage, readAdminCache, writeAdminCache } from "@/lib/api-client";
+import { apiFetch, errorMessage, readAdminCache, writeAdminCache } from "@/lib/api-client";
 import { formatSessionDate, won } from "@/lib/format";
+import AttendeeListActions from "./AttendeeListActions";
 
 type Summary = {
   show: { id: string; title: string; startsAt: string | null; salesOpenAt: string | null };
@@ -32,15 +33,6 @@ export default function SalesSummary() {
       })
       .catch((error: unknown) => setMessage(errorMessage(error, "판매 현황을 불러오지 못했어요.")));
   }, []);
-
-  const download = async () => {
-    setMessage("");
-    try {
-      await apiDownload("/admin/attendees?format=csv", "예매자 명단.csv");
-    } catch (error: unknown) {
-      setMessage(errorMessage(error, "명단을 내려받지 못했어요."));
-    }
-  };
 
   if (summary === undefined) {
     return message ? <p className="rounded-md bg-surface px-4 py-3 text-meta text-ink-2">{message}</p> : <div className="bone h-[132px] w-full" />;
@@ -100,14 +92,8 @@ export default function SalesSummary() {
         ))}
       </dl>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-line px-5 py-3">
-        <button type="button" onClick={() => void download()} className="btn-secondary btn-sm">
-          명단 엑셀로 받기
-        </button>
-        <Link href="/admin/reservations/print" className="btn-secondary btn-sm">
-          현장용 명단 인쇄
-        </Link>
-        {message && <p className="text-meta text-brand-600">{message}</p>}
+      <div className="border-t border-line px-5 py-3">
+        <AttendeeListActions />
       </div>
     </section>
   );

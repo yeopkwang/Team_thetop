@@ -52,3 +52,9 @@ export async function readBody<S extends ZodTypeAny>(req: Request, schema: S): P
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0]?.message || "입력값을 확인해 주세요.");
   return parsed.data;
 }
+
+// 요청을 보낸 곳의 IP. Vercel은 x-forwarded-for를 실제 접속 주소로 덮어써서 관객이 꾸며 보낼 수 없다.
+// 로컬(next start)처럼 머리말이 없으면 "unknown" 하나로 묶는다.
+export function clientIp(req: Request) {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip")?.trim() || "unknown";
+}

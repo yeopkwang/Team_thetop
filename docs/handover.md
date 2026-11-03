@@ -100,7 +100,7 @@ SEED_ADMIN_USERNAME=새아이디 SEED_ADMIN_PASSWORD='10자 이상 비밀번호'
 | --- | --- |
 | 사이트 전체가 '일시적인 문제' 오류 | Supabase 프로젝트가 Paused인지. 그렇다면 대시보드에서 Restore |
 | 카카오 로그인 뒤 로그인 화면으로 돌아옴 | Kakao Developers의 Redirect URI, Vercel의 `KAKAO_CLIENT_ID`·`APP_URL` |
-| 운영진 로그인이 '잠시 막아 뒀어요' | 같은 아이디로 비밀번호를 10번 틀림. 15분 기다리면 풀림 |
+| 운영진 로그인이 '잠시 막아 뒀어요' | 같은 곳(IP)에서 같은 아이디로 10번 틀림(여러 곳 합쳐 50번이면 아이디 전체). 15분 기다리거나 다른 네트워크에서 로그인 |
 | DB 깨우기가 도는지 궁금함 | Vercel 프로젝트 > Settings > Cron Jobs의 실행 기록 |
 | 배포가 실패함 | Vercel 프로젝트 > Deployments에서 실패한 배포의 Build Logs |
 

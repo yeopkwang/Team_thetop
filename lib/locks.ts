@@ -7,3 +7,8 @@ export async function advisoryLock(tx: Prisma.TransactionClient, key: number) {
   // pg_advisory_xact_lock은 void를 돌려줘서 Prisma가 읽지 못한다. 글자로 바꿔 받는다.
   await tx.$queryRaw`SELECT pg_advisory_xact_lock(${key})::text AS locked`;
 }
+
+// 이름으로 잡는 잠금(예: "login:아이디"). 같은 이름끼리만 서로 기다린다.
+export async function advisoryLockFor(tx: Prisma.TransactionClient, name: string) {
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${name}))::text AS locked`;
+}

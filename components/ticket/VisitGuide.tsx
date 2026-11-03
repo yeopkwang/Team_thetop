@@ -1,5 +1,6 @@
 import CalendarLinks from "@/components/CalendarLinks";
 import { showEvent } from "@/lib/calendar";
+import { mapLinks } from "@/lib/maps";
 
 type Props = {
   show: {
@@ -41,12 +42,11 @@ export default function VisitGuide({ show, startsAt, appUrl }: Props) {
               {show.venue}
               {show.venueAddress && <span className="block text-meta text-ink-3">{show.venueAddress}</span>}
               <span className="mt-1.5 flex gap-3 text-meta font-semibold">
-                <a href={`https://map.kakao.com/?q=${encodeURIComponent(place)}`} target="_blank" rel="noreferrer" className="underline underline-offset-2">
-                  카카오맵
-                </a>
-                <a href={`https://map.naver.com/p/search/${encodeURIComponent(place)}`} target="_blank" rel="noreferrer" className="underline underline-offset-2">
-                  네이버 지도
-                </a>
+                {mapLinks(place).map((m) => (
+                  <a key={m.name} href={m.href} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                    {m.name}
+                  </a>
+                ))}
               </span>
             </dd>
           </div>

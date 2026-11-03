@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { apiDownload, apiFetch, errorMessage } from "@/lib/api-client";
+import { apiFetch, errorMessage } from "@/lib/api-client";
 import { performerNames } from "@/lib/credits";
 import { fromKstInput, toKstInput } from "@/lib/format";
 import { normalizeSetlist } from "@/lib/setlist";
 import { SITE } from "@/lib/site";
 import { SHOW_STATUS, type ShowStatusKey } from "@/lib/status";
+import AttendeeListActions from "./AttendeeListActions";
 import ReadinessChecklist from "./ReadinessChecklist";
 import SetlistEditor, { fromEditSetlist, setlistColumns, toEditSetlist, type EditSection } from "./SetlistEditor";
 
@@ -228,16 +229,6 @@ export default function ShowForm({ showId }: { showId?: string }) {
       setMessage(errorMessage(error, "포스터를 올리지 못했어요."));
     } finally {
       setUploading(false);
-    }
-  };
-
-  const downloadAttendees = async () => {
-    if (!showId) return;
-    setMessage("");
-    try {
-      await apiDownload(`/admin/attendees?show=${showId}&format=csv`, "예매자 명단.csv");
-    } catch (error: unknown) {
-      setMessage(errorMessage(error, "명단을 내려받지 못했어요."));
     }
   };
 
@@ -489,14 +480,7 @@ export default function ShowForm({ showId }: { showId?: string }) {
 
       {showId && (
         <Group title="예매자 명단" description="이 공연의 예매자를 엑셀로 받거나, 입금 확인된 관객을 이름순으로 인쇄해요.">
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void downloadAttendees()} className="btn-secondary btn-sm">
-              엑셀로 받기
-            </button>
-            <Link href={`/admin/reservations/print?show=${showId}`} className="btn-secondary btn-sm">
-              현장용 명단 인쇄
-            </Link>
-          </div>
+          <AttendeeListActions showId={showId} excelLabel="엑셀로 받기" />
         </Group>
       )}
 

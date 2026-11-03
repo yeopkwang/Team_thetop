@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import StatusBadge from "@/components/StatusBadge";
 import { useStaffLevel } from "@/components/admin/StaffLevel";
-import { apiFetch, errorMessage } from "@/lib/api-client";
+import { apiFetch, errorMessage, setToken, writeStaffLevel } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
 import { ROLE_INFO } from "@/lib/roles";
 
@@ -19,6 +19,7 @@ function Notice({ text }: { text: string }) {
 
 // 내 비밀번호 바꾸기(관리자·스태프 모두).
 function ChangePassword() {
+  const level = useStaffLevel();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [again, setAgain] = useState("");
@@ -34,11 +35,14 @@ function ChangePassword() {
     setBusy(true);
     setMessage("");
     try {
-      await apiFetch("/auth/password", { method: "POST", bodyJson: { current, next } });
+      // 비밀번호를 바꾸면 다른 기기의 로그인은 끊긴다. 이 기기는 새로 받은 토큰으로 이어 쓴다.
+      const { token } = await apiFetch<{ token: string }>("/auth/password", { method: "POST", bodyJson: { current, next } });
+      setToken(token);
+      writeStaffLevel(level); // setToken이 지운 권한 기억을 바로 채워, 헤더 메뉴가 깜빡이지 않게
       setCurrent("");
       setNext("");
       setAgain("");
-      setMessage("비밀번호를 바꿨어요. 다음 로그인부터 새 비밀번호를 써 주세요.");
+      setMessage("비밀번호를 바꿨어요. 다른 기기에서 로그인해 둔 것은 끊겼어요. 다음 로그인부터 새 비밀번호를 써 주세요.");
     } catch (error: unknown) {
       setMessage(errorMessage(error, "비밀번호를 바꾸지 못했어요."));
     } finally {

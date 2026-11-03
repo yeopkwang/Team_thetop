@@ -188,6 +188,9 @@ function LoginPageContent() {
                   <input
                     id="admin-id"
                     autoComplete="username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={loginId}
                     onChange={(e) => setLoginId(e.target.value)}
                     className="field mt-1.5"

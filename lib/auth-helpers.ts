@@ -11,23 +11,34 @@ export function activeRoles(): Prisma.UserRoleWhereInput {
   return { isActive: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] };
 }
 
-function userIdFromAuthHeader() {
+function tokenFromAuthHeader() {
   const authHeader = headers().get("authorization") || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";
   if (!token) throw new HttpError(401, "로그인이 필요해요.");
 
   const payload = verifyToken(token);
   if (!payload) throw new HttpError(401, "로그인이 만료됐어요. 다시 로그인해 주세요.");
-  return payload.userId;
+  return payload;
 }
 
 // 로그인한 사용자와 지금 유효한 역할.
+// 비밀번호를 바꾼 뒤에는 그 전에 받은 토큰을 받지 않는다(새어 나간 비밀번호로 이미 로그인한 사람을 끊으려고).
 export async function requireSession() {
+  const token = tokenFromAuthHeader();
   const user = await prisma.user.findUnique({
-    where: { id: userIdFromAuthHeader() },
-    select: { id: true, name: true, roles: { where: activeRoles(), select: { role: { select: { type: true } } } } },
+    where: { id: token.userId },
+    select: {
+      id: true,
+      name: true,
+      credential: { select: { passwordChangedAt: true } },
+      roles: { where: activeRoles(), select: { role: { select: { type: true } } } },
+    },
   });
   if (!user) throw new HttpError(401, "로그인이 만료됐어요. 다시 로그인해 주세요.");
+  const changedAt = user.credential?.passwordChangedAt;
+  if (changedAt && (token.iat ?? 0) < Math.floor(changedAt.getTime() / 1000)) {
+    throw new HttpError(401, "비밀번호가 바뀌었어요. 다시 로그인해 주세요.");
+  }
   return { user: { id: user.id, name: user.name, roles: user.roles.map((r) => r.role.type) } };
 }
 
