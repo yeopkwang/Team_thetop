@@ -38,15 +38,23 @@ export default function ShowTabs({ tabs }: { tabs: Tab[] }) {
               aria-selected={selected}
               aria-controls={`panel-${tab.id}`}
               onClick={() => select(tab.id)}
-              className={`relative h-[52px] flex-1 text-[15px] ${
+              className={`h-[52px] flex-1 text-[15px] transition-colors duration-200 ${
                 selected ? "font-bold text-ink" : "font-medium text-ink-3 hover:text-ink"
               }`}
             >
               {tab.label}
-              {selected && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-ink" />}
             </button>
           );
         })}
+        {/* 탭 너비가 모두 같아서, 고른 탭 순서만큼 밑줄을 옮긴다 */}
+        <span
+          aria-hidden
+          className="absolute -bottom-px left-0 h-[2px] bg-ink transition-transform duration-300 ease-out"
+          style={{
+            width: `${100 / tabs.length}%`,
+            transform: `translateX(${Math.max(0, tabs.findIndex((t) => t.id === active)) * 100}%)`,
+          }}
+        />
       </div>
 
       {tabs.map((tab) => (
@@ -56,7 +64,7 @@ export default function ShowTabs({ tabs }: { tabs: Tab[] }) {
           id={`panel-${tab.id}`}
           aria-labelledby={`tab-${tab.id}`}
           hidden={tab.id !== active}
-          className="py-8 lg:py-10"
+          className={`py-8 lg:py-10 ${tab.id === active ? "page-enter" : ""}`}
         >
           {tab.content}
         </div>

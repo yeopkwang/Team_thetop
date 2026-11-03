@@ -15,6 +15,7 @@ type ReservationItem = {
   userId: string;
   userName: string;
   userEmail?: string | null;
+  event?: { title?: string };
 };
 
 type ReservationListResponse = { reservations: ReservationItem[]; nextCursor: string | null };
@@ -95,7 +96,10 @@ export default function AdminReservationsPage() {
     return items.filter((r) => {
       if (statuses && !statuses.includes(r.status)) return false;
       if (!q) return true;
-      return [r.userName, r.userEmail || "", r.preferredPerformerName, bookingNumber(r.id)].join(" ").toLowerCase().includes(q);
+      return [r.userName, r.userEmail || "", r.preferredPerformerName, bookingNumber(r.id), r.event?.title || ""]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
     });
   }, [items, query, filter]);
 
@@ -125,7 +129,7 @@ export default function AdminReservationsPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="이름, 관심 공연자, 예매번호로 검색"
+            placeholder="이름, 관심 공연자, 예매번호, 공연명으로 검색"
             className="field"
           />
         </label>
@@ -144,6 +148,7 @@ export default function AdminReservationsPage() {
             <thead className="border-y border-line bg-surface text-meta text-ink-3">
               <tr>
                 <th className="px-3 py-2.5 font-semibold">예매번호</th>
+                <th className="px-3 py-2.5 font-semibold">공연</th>
                 <th className="px-3 py-2.5 font-semibold">예매자</th>
                 <th className="px-3 py-2.5 font-semibold">관심 공연자</th>
                 <th className="px-3 py-2.5 font-semibold">상태</th>
@@ -156,6 +161,7 @@ export default function AdminReservationsPage() {
                 return (
                   <tr key={r.id}>
                     <td className="px-3 py-3 font-semibold tabular-nums tracking-wide">{bookingNumber(r.id)}</td>
+                    <td className="px-3 py-3 text-ink-2">{r.event?.title || "-"}</td>
                     <td className="px-3 py-3">
                       {r.userName}
                       {r.userEmail && <span className="block text-cap text-ink-3">{r.userEmail}</span>}
@@ -182,6 +188,12 @@ export default function AdminReservationsPage() {
                     <StatusBadge label={s.label} tone={s.tone} />
                   </div>
                   <p className="mt-1 text-meta text-ink-3">
+                    {r.event?.title && (
+                      <>
+                        {r.event.title}
+                        <span className="mx-1.5 text-line-strong">|</span>
+                      </>
+                    )}
                     관심 공연자 {r.preferredPerformerName}
                     <span className="mx-1.5 text-line-strong">|</span>
                     {bookingNumber(r.id)}

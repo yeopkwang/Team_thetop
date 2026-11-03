@@ -11,6 +11,7 @@ type PendingBooking = {
     createdAt: string;
     preferredPerformerName: string;
     user?: { email?: string | null; name?: string | null };
+    event?: { title?: string };
   };
 };
 
@@ -274,7 +275,10 @@ export default function AdminPage() {
                   <span className="mx-1.5 text-line-strong">|</span>
                   {bookingNumber(booking.id)}
                 </p>
-                <p className="text-meta text-ink-3">{formatDateTime(booking.createdAt)} 예매</p>
+                <p className="text-meta text-ink-3">
+                  {booking.event?.title ? `${booking.event.title}, ` : ""}
+                  {formatDateTime(booking.createdAt)} 예매
+                </p>
               </div>
               <button
                 type="button"

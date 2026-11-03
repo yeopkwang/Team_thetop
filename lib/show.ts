@@ -1,16 +1,30 @@
+import { ShowStatus } from "@prisma/client";
 import { prisma } from "./prisma";
 import { SEAT_HOLDING_STATUSES } from "./reservations";
 
-// 홈·예매 화면에 나오는 공연: isActive인 공연 중 가장 최근에 만든 것.
+const withSessions = { sessions: { orderBy: { date: "asc" as const } } };
+
+// 첫 화면·공연 안내·예매에 나오는 공연: 판매 중인 공연(한 번에 하나만 둔다).
 export async function getCurrentShow() {
   return prisma.show.findFirst({
-    where: { isActive: true },
+    where: { status: ShowStatus.ON_SALE },
     orderBy: { createdAt: "desc" },
-    include: { sessions: { orderBy: { date: "asc" } } },
+    include: withSessions,
   });
 }
 
 export type CurrentShow = NonNullable<Awaited<ReturnType<typeof getCurrentShow>>>;
+
+// 지난 공연 목록: 최근 공연부터. 회차 날짜가 없으면 만든 순서로 둔다.
+export async function getPastShows() {
+  const shows = await prisma.show.findMany({ where: { status: ShowStatus.ENDED }, include: withSessions });
+  const when = (s: (typeof shows)[number]) => (s.sessions[0]?.date ?? s.createdAt).getTime();
+  return shows.sort((a, b) => when(b) - when(a));
+}
+
+export async function getPastShow(id: string) {
+  return prisma.show.findFirst({ where: { id, status: ShowStatus.ENDED }, include: withSessions });
+}
 
 // 공연의 회차별 잔여석.
 export async function getSessionAvailability(show: CurrentShow) {

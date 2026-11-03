@@ -143,7 +143,16 @@ export default function MyTicketPage() {
   let body: React.ReactNode = null;
 
   if (view === "loading") {
-    body = <div className="mx-auto h-[520px] max-w-[400px] animate-pulse rounded-2xl bg-white" />;
+    body = (
+      <div aria-busy="true" aria-label="불러오는 중" className="mx-auto max-w-[400px] overflow-hidden rounded-2xl border border-line bg-white">
+        <div className="h-[150px] bg-brand-600/15" />
+        <div className="flex flex-col items-center gap-3 px-6 py-7">
+          <div className="bone h-[200px] w-[200px]" />
+          <div className="bone h-4 w-40" />
+          <div className="bone mt-4 h-20 w-full" />
+        </div>
+      </div>
+    );
   } else if (view === "login") {
     body = (
       <EmptyState title="로그인하면 예매한 티켓을 볼 수 있어요" description="예매할 때 쓴 카카오 계정으로 로그인해 주세요.">
@@ -255,7 +264,9 @@ export default function MyTicketPage() {
     <main className="min-h-full bg-surface pb-16">
       <div className="page pt-6 lg:pt-10">
         <h1 className="mx-auto mb-6 max-w-[400px] text-h1 font-bold">마이 티켓</h1>
-        {body}
+        <div key={view} className={view === "loading" ? "" : "page-enter"}>
+          {body}
+        </div>
       </div>
     </main>
   );

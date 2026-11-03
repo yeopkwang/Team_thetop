@@ -1,10 +1,10 @@
-import { PrismaClient, RoleType } from "@prisma/client";
+import { PrismaClient, RoleType, ShowStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-// 공연 정보는 관리자 페이지(/admin/show)에서 채운다. 아래는 2026년 공연 안내문의 틀이고,
-// ○ 표시는 해마다 바뀌는 값이다. 처음에는 공개하지 않은 상태(isActive: false)로 만든다.
+// 공연 정보는 관리자 페이지 '공연 관리'(/admin/shows)에서 채운다. 아래는 2026년 공연 안내문의 틀이고,
+// ○ 표시는 해마다 바뀌는 값이다. 새 공연은 준비 중(DRAFT) 상태로 만든다.
 const INTRO_TEXT = `반송고등학교 연합 밴드 '작전명문' ○번째 공연, 작전명문 ○
 
 [작전명문 ○]는 동탄 반송고등학교 재학생과 졸업생이 함께 만드는 밴드 공연입니다.
@@ -88,33 +88,96 @@ async function seedAdmin() {
   console.log(`관리자 계정 '${username}'을(를) 만들었습니다.`);
 }
 
-async function seedShow() {
-  if ((await prisma.show.count()) > 0) {
-    console.log("공연이 이미 있어서 공연 틀은 만들지 않습니다.");
+// 지난 공연. 4회는 2026년 공연 안내 페이지에 실렸던 내용이고, 1~3회는 제목과 연도만 넣어 둔다
+// (2023년에 시작해 해마다 열린 것으로 보고 연도를 적었다). 나머지는 관리자 페이지에서 채운다.
+// 회차 날짜는 지난 공연 목록의 순서를 정하는 데 쓰인다.
+const PAST_SHOWS = [
+  { id: "operation-moon-1", title: "작전명문 1", dateLabel: "2023년", date: "2023-02-01T09:00:00Z" },
+  { id: "operation-moon-2", title: "작전명문 2", dateLabel: "2024년", date: "2024-02-01T09:00:00Z" },
+  { id: "operation-moon-3", title: "작전명문 3", dateLabel: "2025년", date: "2025-02-01T09:00:00Z" },
+  {
+    id: "operation-moon-4",
+    title: "작전명문 4",
+    dateLabel: "2026년 02월 22일 (일)",
+    date: "2026-02-22T09:00:00Z",
+    posterUrl: "/uploads/sample-poster.png",
+    timeLabel: "18:00 ~ 21:00",
+    timeSubLabel: "인터미션 포함 / 입장 가능 17:30",
+    venue: "공덕 DGT 아트센터",
+    venueAddress: "서울특별시 마포구 독막로 308",
+    audienceInfo: "관객 100명, 전원 스탠딩",
+    price: 7000,
+    contactTag: "@band.bansong",
+    capacity: 106,
+    introText: `반송고등학교 연합 밴드 '작전명문' 4번째 공연, 작전명문 4
+
+[작전명문 4]는 동탄 반송고등학교 재학생과 졸업생이 함께 만든 밴드 공연입니다.
+2023년 첫 공연을 시작으로 4년째 이어지며, 선후배가 음악으로 교류하는 연례 무대를 만들어 나가고 있습니다.
+
+# SETLIST 1부
+1. 시간을 달리네 - 한로로
+2. 여우야 - 더클래식
+3. 못난이 - 루시
+4. 물가의 라이온 - 쏜애플
+5. 계속 웃을 순 없어 - 유다빈밴드
+6. Likes & Hearts - Sonakonadore
+7. 사랑이 잘 - 아이유, 혁오 (With. Sunset Rollercoaster)
+8. 홍련화 - L!SA
+9. 빨간 피터 - 쏜애플
+
+# SETLIST 2부
+1. 사랑하게 될거야 - 한로로
+2. Popo (How Deep Is Our Love?) - 백예린
+3. Make Up (최예근 Ver.) - 샘김
+4. She Used To Be Mine - Waitress
+5. Toxic (Couch Ver.) - Britney Spears
+6. SOME LIKE IT HOT!! - SPYAIR
+7. 나는 최강 - Mrs. Green Apple
+8. T + Tik Tak Tok - 실리카겔
+9. 오늘이야 - 유다빈밴드`,
+  },
+];
+
+async function seedShows() {
+  for (const { id, date, capacity, ...fields } of PAST_SHOWS) {
+    if (await prisma.show.findUnique({ where: { id }, select: { id: true } })) continue;
+    await prisma.show.create({
+      data: {
+        id,
+        ...fields,
+        status: ShowStatus.ENDED,
+        sessions: { create: { title: "1회차", date: new Date(date), totalCapacity: capacity ?? 100 } },
+      },
+    });
+    console.log(`지난 공연 '${fields.title}'을(를) 만들었습니다.`);
+  }
+
+  // 판매 중이거나 준비 중인 공연이 없을 때만 다음 공연 틀을 만든다.
+  if ((await prisma.show.count({ where: { status: { not: ShowStatus.ENDED } } })) > 0) {
+    console.log("준비 중이거나 판매 중인 공연이 있어서 새 공연 틀은 만들지 않습니다.");
     return;
   }
   await prisma.show.create({
     data: {
       title: "작전명문 5",
-      posterUrl: "/uploads/sample-poster.png",
       notice:
         "본 공연은 온라인 예매로 진행되며, 예매하신 티켓의 취소/환불 관련 사항은 공연 안내 규정에 따라 적용됩니다.",
       contactTag: "@band.bansong",
       introText: INTRO_TEXT,
       salesText: SALES_TEXT,
-      isActive: false,
+      status: ShowStatus.DRAFT,
       sessions: {
         create: { title: "1회차", date: new Date("2027-02-21T09:00:00Z"), totalCapacity: 100 },
       },
     },
   });
-  console.log("공연 틀을 만들었습니다(비공개). 관리자 페이지 > 공연 정보에서 채운 뒤 공개하세요.");
+  console.log("새 공연 틀을 만들었습니다(준비 중). 관리자 페이지 > 공연 관리에서 채운 뒤 판매 중으로 바꾸세요.");
 }
 
 async function main() {
   await seedRoles();
   await seedAdmin();
-  await seedShow();
+  await seedShows();
 }
 
 main()

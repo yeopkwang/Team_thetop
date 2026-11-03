@@ -33,6 +33,13 @@ enum TicketStatus {
   REVOKED
 }
 
+// 공연 상태. 판매 중(ON_SALE)은 한 번에 하나만 둔다.
+enum ShowStatus {
+  DRAFT // 준비 중: 어디에도 보이지 않는다
+  ON_SALE // 판매 중: 첫 화면·공연 안내·예매에 나온다
+  ENDED // 지난 공연: 지난 공연 목록에 나온다
+}
+
 enum RefundStatus {
   REQUESTED
   PENDING
@@ -76,32 +83,31 @@ model UserRole {
   @@index([userId, isActive, expiresAt])
 }
 
-// 공연 한 편. isActive인 공연 중 가장 최근에 만든 것이 홈·예매 화면에 나온다.
-// 화면 문구는 관리자 페이지(/admin/show)에서 바꾼다.
+// 공연 한 편. 화면 문구와 상태는 관리자 페이지 '공연 관리'(/admin/shows)에서 바꾼다.
 model Show {
-  id             String   @id @default(cuid())
+  id             String     @id @default(cuid())
   title          String
   posterUrl      String?
-  dateLabel      String   @default("")
-  timeLabel      String   @default("")
-  timeSubLabel   String   @default("")
-  venue          String   @default("")
-  venueAddress   String   @default("")
-  contactName    String   @default("")
-  contactTag     String   @default("")
-  audienceInfo   String   @default("")
-  notice         String   @default("")
-  price          Int      @default(0)
-  paymentBank    String   @default("")
-  paymentAccount String   @default("")
-  paymentHolder  String   @default("")
-  refundContact  String   @default("")
+  dateLabel      String     @default("")
+  timeLabel      String     @default("")
+  timeSubLabel   String     @default("")
+  venue          String     @default("")
+  venueAddress   String     @default("")
+  contactName    String     @default("")
+  contactTag     String     @default("")
+  audienceInfo   String     @default("")
+  notice         String     @default("")
+  price          Int        @default(0)
+  paymentBank    String     @default("")
+  paymentAccount String     @default("")
+  paymentHolder  String     @default("")
+  refundContact  String     @default("")
   // 빈 줄로 칸을 나누고, 칸의 첫 줄이 "# "로 시작하면 굵은 제목으로 보인다.
-  introText      String   @default("")
-  salesText      String   @default("")
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  introText      String     @default("")
+  salesText      String     @default("")
+  status         ShowStatus @default(DRAFT)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
   sessions ShowSession[]
 }

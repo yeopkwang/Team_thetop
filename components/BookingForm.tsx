@@ -92,7 +92,7 @@ export default function BookingForm({
   const submitLabel = submitting ? "예매하는 중" : "예매하기";
 
   return (
-    <main className="pb-16">
+    <main className="page-enter pb-16">
       <div className="page pt-6 lg:pt-10">
         <h1 className="text-h1 font-bold">예매하기</h1>
 

@@ -25,3 +25,11 @@ export function reservationStatus(status: string) {
 export function refundStatus(status: string) {
   return REFUND[status] || { label: status, tone: "muted" as StatusTone };
 }
+
+export type ShowStatusKey = "DRAFT" | "ON_SALE" | "ENDED";
+
+export const SHOW_STATUS: Record<ShowStatusKey, { label: string; description: string; tone: StatusTone }> = {
+  DRAFT: { label: "준비 중", description: "어디에도 보이지 않아요.", tone: "muted" },
+  ON_SALE: { label: "판매 중", description: "첫 화면·공연 안내에 나오고 예매를 받아요.", tone: "brand" },
+  ENDED: { label: "지난 공연", description: "지난 공연 목록에 나와요. 예매는 받지 않아요.", tone: "wait" },
+};

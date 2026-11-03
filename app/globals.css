@@ -79,6 +79,32 @@
   }
 }
 
+/* 화면을 옮길 때 새 화면이 부드럽게 드러난다. 위치를 움직이면(transform) 안쪽의 하단 고정 바가
+   잠깐 엉뚱한 곳에 그려지므로 투명도만 바꾼다. */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.page-enter {
+  animation: page-enter 0.28s ease-out both;
+}
+
+/* 불러오는 동안 보여 주는 회색 뼈대 */
+@keyframes bone-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+.bone {
+  background: theme("colors.surface");
+  border-radius: 6px;
+  animation: bone-pulse 1.4s ease-in-out infinite;
+}
+
 /* 첫 화면이 열릴 때 한 번만: 名門이 천천히 드러나고, 제목과 버튼이 차례로 떠오른다. */
 @keyframes landing-rise {
   from {

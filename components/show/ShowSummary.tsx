@@ -14,10 +14,18 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 // 공연 안내 위쪽: 장르 표시와 제목, (PC에서) 포스터, 기본 정보.
-export default function ShowSummary({ show, period }: { show: Fields; period: string }) {
+export default function ShowSummary({
+  show,
+  period,
+  badge = "콘서트",
+}: {
+  show: Fields;
+  period: string;
+  badge?: string;
+}) {
   return (
     <section className="pt-6 lg:pt-0">
-      <span className="inline-block rounded-sm border border-line-strong px-1.5 py-px text-cap text-ink-2">콘서트</span>
+      <span className="inline-block rounded-sm border border-line-strong px-1.5 py-px text-cap text-ink-2">{badge}</span>
       <h1 className="mt-2 text-h2 font-bold text-ink lg:text-h1">{show.title}</h1>
 
       <div className="mt-5 border-t border-ink pt-5 lg:mt-6 lg:grid lg:grid-cols-[240px_1fr] lg:gap-8 lg:pt-6">

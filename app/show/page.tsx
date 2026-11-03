@@ -68,7 +68,7 @@ export default async function ShowPage() {
   ];
 
   return (
-    <main className="pb-16">
+    <main className="page-enter pb-16">
       <MobilePosterHero src={show.posterUrl} title={show.title} />
 
       <div className="page lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-10 lg:pt-10">

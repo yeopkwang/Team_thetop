@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ReservationStatus } from "@prisma/client";
+import { ReservationStatus, ShowStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth-helpers";
 import { HttpError, errorResponse } from "@/lib/http";
@@ -34,9 +34,9 @@ export async function POST(req: Request) {
 
       const showSession = await tx.showSession.findUniqueOrThrow({
         where: { id: sessionId },
-        include: { show: { select: { isActive: true } } },
+        include: { show: { select: { status: true } } },
       });
-      if (!showSession.show.isActive) throw new HttpError(400, "지금 예매 중인 공연이 아닙니다.");
+      if (showSession.show.status !== ShowStatus.ON_SALE) throw new HttpError(400, "지금 예매 중인 공연이 아닙니다.");
 
       const alreadyBooked = await tx.reservation.findFirst({
         where: { userId: session.user.id, sessionId, status: { notIn: CLOSED_STATUSES } },
