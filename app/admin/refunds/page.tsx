@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import StatusBadge from "@/components/StatusBadge";
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, readAdminCache, writeAdminCache } from "@/lib/api-client";
 import { bookingNumber, formatDateTime } from "@/lib/format";
 import { refundStatus } from "@/lib/status";
 
@@ -21,10 +21,11 @@ export default function AdminRefundsPage() {
   const [message, setMessage] = useState("");
 
   const load = async () => {
-    setLoading(true);
     try {
       const data = await apiFetch<{ refunds: RefundItem[] }>("/admin/refunds");
-      setItems(Array.isArray(data?.refunds) ? data.refunds : []);
+      const refunds = Array.isArray(data?.refunds) ? data.refunds : [];
+      setItems(refunds);
+      writeAdminCache("refunds", refunds);
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : "환불 요청 목록을 불러오지 못했어요.");
     } finally {
@@ -33,6 +34,12 @@ export default function AdminRefundsPage() {
   };
 
   useEffect(() => {
+    // 전에 본 목록이 있으면 먼저 보여 주고 새 목록으로 바꾼다.
+    const cached = readAdminCache<RefundItem[]>("refunds");
+    if (cached) {
+      setItems(cached);
+      setLoading(false);
+    }
     void load();
   }, []);
 

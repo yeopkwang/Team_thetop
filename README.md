@@ -78,11 +78,14 @@ npm run dev                   # http://localhost:3000
 
 ## 배포 (Vercel + Supabase)
 
-1. Supabase에서 프로젝트를 만들고 연결 문자열 두 개를 받습니다.
+1. Supabase에서 프로젝트를 만들고(지역은 **서울**) 연결 문자열 두 개를 받습니다.
 2. 내 컴퓨터에서 `.env`에 그 값을 넣고 `npm run prisma:deploy`, `npm run prisma:seed`를 실행합니다.
 3. Vercel 프로젝트 환경변수에 `DATABASE_URL`, `DIRECT_URL`, `APP_URL`, `JWT_SECRET`, 카카오 값 3개를 넣습니다.
 4. 카카오 개발자 콘솔에 Redirect URI와 로그아웃 Redirect URI를 등록합니다.
 5. Vercel이 배포하는 브랜치에 푸시합니다. 빌드는 `prisma generate && next build`입니다.
+
+Vercel 서버 지역은 `vercel.json`에서 서울(`icn1`)로 고정합니다. 기본값(미국 동부)으로 두면 서울 DB에 한 번 물을 때마다
+태평양을 왕복해서 관리자 화면이 몇 초씩 걸립니다. DB 지역을 바꾸면 이 값도 같은 곳으로 맞추세요.
 
 Supabase 무료 플랜은 오래 안 쓰면 프로젝트가 일시정지됩니다. 판매 시작 전에 대시보드에서 살아 있는지 확인하세요.
 

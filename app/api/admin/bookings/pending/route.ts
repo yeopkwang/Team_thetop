@@ -17,22 +17,27 @@ export async function GET() {
     await requireRoleAtLeast(RoleType.STAFF);
     await expireOverdue();
 
-    const pending = await prisma.reservation.findMany({
-      where: { status: { in: PENDING_STATUSES } },
-      include,
-      orderBy: { createdAt: "desc" },
-    });
-    const expired = await prisma.reservation.findMany({
+    // 한 번에 받아서 입금 대기(최근 예매부터) 다음에 만료(최근 만료부터) 순으로 놓는다.
+    const rows = await prisma.reservation.findMany({
       where: {
-        status: ReservationStatus.EXPIRED,
-        session: { date: { gt: new Date() }, show: { status: ShowStatus.ON_SALE } },
+        OR: [
+          { status: { in: PENDING_STATUSES } },
+          { status: ReservationStatus.EXPIRED, session: { date: { gt: new Date() }, show: { status: ShowStatus.ON_SALE } } },
+        ],
       },
       include,
-      orderBy: { expiresAt: "desc" },
     });
+    const isExpired = (b: (typeof rows)[number]) => b.status === ReservationStatus.EXPIRED;
+    rows.sort((a, b) =>
+      isExpired(a) !== isExpired(b)
+        ? Number(isExpired(a)) - Number(isExpired(b))
+        : isExpired(a)
+          ? b.expiresAt.getTime() - a.expiresAt.getTime()
+          : b.createdAt.getTime() - a.createdAt.getTime()
+    );
 
     return NextResponse.json({
-      bookings: [...pending, ...expired].map((b) => ({
+      bookings: rows.map((b) => ({
         id: b.id,
         status: b.status,
         createdAt: b.createdAt,

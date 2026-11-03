@@ -71,24 +71,40 @@ async function seatHolding(sessionIds: string[], db: Prisma.TransactionClient = 
 }
 
 // 공연 관리 목록: 최근 공연부터, 회차 날짜와 좌석을 잡은 예매 수를 함께.
+// 예매 수는 공연마다 따로 묻지 않고 한 번에 센다(DB 왕복 횟수가 곧 속도라서).
 export async function listShows() {
   await expireOverdue();
   const shows = await prisma.show.findMany({
-    include: { sessions: { orderBy: { date: "asc" }, select: { id: true, date: true, totalCapacity: true } } },
+    select: {
+      id: true,
+      title: true,
+      posterUrl: true,
+      dateLabel: true,
+      status: true,
+      createdAt: true,
+      sessions: { orderBy: { date: "asc" }, select: { id: true, date: true, totalCapacity: true } },
+    },
   });
-  const rows = await Promise.all(
-    shows.map(async (s) => ({
-      id: s.id,
-      title: s.title,
-      posterUrl: s.posterUrl,
-      dateLabel: s.dateLabel,
-      status: s.status,
-      firstDate: s.sessions[0]?.date ?? null,
-      totalCapacity: s.sessions[0]?.totalCapacity ?? 0,
-      reservedQty: await seatHolding(s.sessions.map((x) => x.id)),
-      createdAt: s.createdAt,
-    }))
-  );
+  const sessionIds = shows.flatMap((s) => s.sessions.map((x) => x.id));
+  const held = sessionIds.length
+    ? await prisma.reservation.groupBy({
+        by: ["sessionId"],
+        where: { sessionId: { in: sessionIds }, status: { in: SEAT_HOLDING_STATUSES } },
+        _sum: { qty: true },
+      })
+    : [];
+  const heldBySession = new Map(held.map((h) => [h.sessionId, h._sum.qty || 0]));
+  const rows = shows.map((s) => ({
+    id: s.id,
+    title: s.title,
+    posterUrl: s.posterUrl,
+    dateLabel: s.dateLabel,
+    status: s.status,
+    firstDate: s.sessions[0]?.date ?? null,
+    totalCapacity: s.sessions[0]?.totalCapacity ?? 0,
+    reservedQty: s.sessions.reduce((sum, x) => sum + (heldBySession.get(x.id) || 0), 0),
+    createdAt: s.createdAt,
+  }));
   const when = (r: (typeof rows)[number]) => (r.firstDate ?? r.createdAt).getTime();
   return rows.sort((a, b) => when(b) - when(a));
 }

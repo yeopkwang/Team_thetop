@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import StatusBadge from "@/components/StatusBadge";
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, readAdminCache, writeAdminCache } from "@/lib/api-client";
 import { bookingNumber, formatDateTime } from "@/lib/format";
 import { reservationStatus } from "@/lib/status";
 
@@ -23,7 +23,6 @@ type ReservationItem = {
 
 type ReservationListResponse = { reservations: ReservationItem[]; nextCursor: string | null };
 
-const CACHE_KEY = "admin_reservations_cache_v2";
 const PAGE_LIMIT = 80;
 
 const FILTERS = [
@@ -46,8 +45,8 @@ export default function AdminReservationsPage() {
 
   const load = async (cursor?: string) => {
     const isLoadMore = Boolean(cursor);
+    // 새로 받을 때는 보고 있던 목록을 그대로 두고 뒤에서 바꾼다(처음엔 loading이 이미 true).
     if (isLoadMore) setLoadingMore(true);
-    else setLoading(true);
 
     try {
       const qs = new URLSearchParams({ limit: String(PAGE_LIMIT) });
@@ -60,7 +59,7 @@ export default function AdminReservationsPage() {
         const merged = isLoadMore
           ? [...prev, ...incoming.filter((x) => !prev.some((p) => p.id === x.id))]
           : incoming;
-        window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ reservations: merged, nextCursor: incomingCursor }));
+        writeAdminCache("reservations", { reservations: merged, nextCursor: incomingCursor });
         return merged;
       });
       setNextCursor(incomingCursor);
@@ -73,15 +72,12 @@ export default function AdminReservationsPage() {
   };
 
   useEffect(() => {
-    try {
-      const cached = JSON.parse(window.sessionStorage.getItem(CACHE_KEY) || "null") as ReservationListResponse | null;
-      if (cached?.reservations?.length) {
-        setItems(cached.reservations);
-        setNextCursor(cached.nextCursor || null);
-        setLoading(false);
-      }
-    } catch {
-      // 캐시가 깨졌으면 무시하고 새로 받는다
+    // 전에 본 목록이 있으면 먼저 보여 주고 새 목록으로 바꾼다.
+    const cached = readAdminCache<ReservationListResponse>("reservations");
+    if (cached?.reservations?.length) {
+      setItems(cached.reservations);
+      setNextCursor(cached.nextCursor || null);
+      setLoading(false);
     }
     void load();
   }, []);

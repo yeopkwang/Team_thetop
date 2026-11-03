@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminNav from "@/components/AdminNav";
-import { apiFetch, getToken } from "@/lib/api-client";
+import { apiFetch, getToken, readAdminRole, writeAdminRole } from "@/lib/api-client";
 
 type MeResponse = { user?: { roles?: string[] } };
 
@@ -15,15 +15,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     let mounted = true;
 
+    if (!getToken()) {
+      router.replace("/login");
+      return;
+    }
+    // 운영진이라고 기억해 둔 계정이면 확인을 기다리지 않고 바로 연다. 목록 API는 서버에서 권한을 다시 보므로
+    // 먼저 열리는 건 화면 틀뿐이고, 뒤에서 한 번 더 확인해 결과가 다르면 내보낸다.
+    if (readAdminRole()?.isAdmin) {
+      setAllowed(true);
+      setChecked(true);
+    }
+
     const check = async () => {
-      if (!getToken()) {
-        router.replace("/login");
-        return;
-      }
       try {
         const me = await apiFetch<MeResponse>("/auth/me");
         const roles = me?.user?.roles || [];
-        if (!roles.includes("ADMIN") && !roles.includes("SUPER_ADMIN")) {
+        const admin = roles.includes("ADMIN") || roles.includes("SUPER_ADMIN");
+        writeAdminRole(admin);
+        if (!admin) {
           router.replace("/");
           return;
         }

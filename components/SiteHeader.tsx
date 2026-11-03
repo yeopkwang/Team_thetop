@@ -3,15 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { apiFetch, getToken } from "@/lib/api-client";
+import { apiFetch, getToken, readAdminRole, writeAdminRole } from "@/lib/api-client";
 import Wordmark from "./Wordmark";
 import { TicketIcon, UserIcon } from "./icons";
 import { useSlidingIndicator } from "./useSlidingIndicator";
 
 type MeResponse = { user?: { roles?: string[] } };
-
-const ADMIN_ROLE_CACHE_KEY = "admin_role_cache_v1";
-const ADMIN_ROLE_CACHE_TTL_MS = 60 * 1000;
 
 function useAuthState() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -28,27 +25,17 @@ function useAuthState() {
         return;
       }
 
-      try {
-        const cached = JSON.parse(window.localStorage.getItem(ADMIN_ROLE_CACHE_KEY) || "null") as {
-          isAdmin: boolean;
-          expiresAt: number;
-        } | null;
-        if (cached && cached.expiresAt > Date.now()) {
-          if (mounted) setIsAdmin(cached.isAdmin);
-          return;
-        }
-      } catch {
-        // 캐시가 깨졌으면 새로 묻는다
+      const cached = readAdminRole();
+      if (cached?.fresh) {
+        if (mounted) setIsAdmin(cached.isAdmin);
+        return;
       }
 
       try {
         const me = await apiFetch<MeResponse>("/auth/me");
         const roles = me?.user?.roles || [];
         const admin = roles.includes("ADMIN") || roles.includes("SUPER_ADMIN");
-        window.localStorage.setItem(
-          ADMIN_ROLE_CACHE_KEY,
-          JSON.stringify({ isAdmin: admin, expiresAt: Date.now() + ADMIN_ROLE_CACHE_TTL_MS })
-        );
+        writeAdminRole(admin);
         if (mounted) setIsAdmin(admin);
       } catch {
         if (mounted) setIsAdmin(false);

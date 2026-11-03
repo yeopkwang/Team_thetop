@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import StatusBadge from "@/components/StatusBadge";
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, readAdminCache, writeAdminCache } from "@/lib/api-client";
 import { matchDeposits } from "@/lib/deposit-match";
 import { bookingNumber, formatDateTime, won } from "@/lib/format";
 
@@ -40,7 +40,9 @@ export default function PendingDeposits() {
   const load = async () => {
     try {
       const data = await apiFetch<{ bookings: Pending[] }>("/admin/bookings/pending");
-      setItems(Array.isArray(data?.bookings) ? data.bookings : []);
+      const bookings = Array.isArray(data?.bookings) ? data.bookings : [];
+      setItems(bookings);
+      writeAdminCache("pending", bookings);
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : "입금 대기 목록을 불러오지 못했어요.");
     } finally {
@@ -49,6 +51,12 @@ export default function PendingDeposits() {
   };
 
   useEffect(() => {
+    // 전에 본 목록이 있으면 먼저 보여 주고 새 목록으로 바꾼다.
+    const cached = readAdminCache<Pending[]>("pending");
+    if (cached) {
+      setItems(cached);
+      setLoading(false);
+    }
     void load();
   }, []);
 
