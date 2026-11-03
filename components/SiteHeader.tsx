@@ -70,8 +70,29 @@ export default function SiteHeader() {
   const pathname = usePathname();
   const { loggedIn, isAdmin } = useAuthState();
 
+  // 첫 화면은 버튼 두 개만 보이도록, 헤더를 투명하게 겹치고 마이 티켓·로그인만 남긴다.
+  if (pathname === "/") {
+    return (
+      <header className="absolute inset-x-0 top-0 z-40">
+        <div className="page flex h-16 items-center justify-end gap-5 text-meta font-semibold text-white/75">
+          <Link href="/myticket" className="hover:text-white">
+            마이 티켓
+          </Link>
+          <Link href="/login" className="hover:text-white">
+            {loggedIn ? "내 계정" : "로그인"}
+          </Link>
+          {isAdmin && (
+            <Link href="/admin" className="hover:text-white">
+              관리자
+            </Link>
+          )}
+        </div>
+      </header>
+    );
+  }
+
   const nav = [
-    { href: "/", label: "공연 안내", active: pathname === "/" },
+    { href: "/show", label: "공연 안내", active: pathname.startsWith("/show") },
     { href: "/book", label: "예매하기", active: pathname.startsWith("/book") },
     { href: "/myticket", label: "마이 티켓", active: pathname.startsWith("/myticket") },
     ...(isAdmin ? [{ href: "/admin", label: "관리자", active: pathname.startsWith("/admin") }] : []),
@@ -80,7 +101,7 @@ export default function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-white">
       <div className="page flex h-[52px] items-center gap-8 lg:h-16">
-        <Link href="/" className="shrink-0" aria-label="작전명;문 공연 안내">
+        <Link href="/" className="shrink-0" aria-label="작전명문 첫 화면">
           <Wordmark />
         </Link>
 

@@ -5,9 +5,9 @@ const prisma = new PrismaClient();
 
 // 공연 정보는 관리자 페이지(/admin/show)에서 채운다. 아래는 2026년 공연 안내문의 틀이고,
 // ○ 표시는 해마다 바뀌는 값이다. 처음에는 공개하지 않은 상태(isActive: false)로 만든다.
-const INTRO_TEXT = `반송고등학교 연합 밴드 '작전명문' ○번째 공연, 작전명;문 ○
+const INTRO_TEXT = `반송고등학교 연합 밴드 '작전명문' ○번째 공연, 작전명문 ○
 
-[작전명;문 ○]는 동탄 반송고등학교 재학생과 졸업생이 함께 만드는 밴드 공연입니다.
+[작전명문 ○]는 동탄 반송고등학교 재학생과 졸업생이 함께 만드는 밴드 공연입니다.
 2023년 첫 공연을 시작으로 선후배가 음악으로 교류하는 연례 무대를 만들어 나가고 있습니다.
 
 # SETLIST 1부
@@ -95,7 +95,7 @@ async function seedShow() {
   }
   await prisma.show.create({
     data: {
-      title: "작전명;문 5",
+      title: "작전명문 5",
       posterUrl: "/uploads/sample-poster.png",
       notice:
         "본 공연은 온라인 예매로 진행되며, 예매하신 티켓의 취소/환불 관련 사항은 공연 안내 규정에 따라 적용됩니다.",

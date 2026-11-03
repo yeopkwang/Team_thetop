@@ -165,7 +165,7 @@ export default function AdminShowPage() {
         },
       });
       apply(data);
-      setMessage("저장했어요. 홈과 예매 화면에 바로 반영돼요.");
+      setMessage("저장했어요. 첫 화면과 공연 안내, 예매 화면에 바로 반영돼요.");
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : "저장하지 못했어요.");
     } finally {
@@ -185,7 +185,7 @@ export default function AdminShowPage() {
             </p>
           )}
 
-          <Group title="판매" description="공개를 끄면 홈에 '예매 중인 공연이 없어요'가 뜨고 예매도 막혀요.">
+          <Group title="판매" description="공개를 끄면 공연 안내에 '예매 중인 공연이 없어요'가 뜨고 예매도 막혀요.">
             <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-line p-4">
               <input
                 type="checkbox"
@@ -194,7 +194,7 @@ export default function AdminShowPage() {
                 className="h-5 w-5 accent-brand-600"
               />
               <span>
-                <span className="block text-[15px] font-semibold">홈·예매 화면에 공개하고 예매 받기</span>
+                <span className="block text-[15px] font-semibold">공개하고 예매 받기</span>
                 <span className="block text-meta text-ink-3">{form.isActive ? "지금 공개 중이에요" : "지금은 비공개예요"}</span>
               </span>
             </label>
@@ -225,7 +225,7 @@ export default function AdminShowPage() {
             </div>
           </Group>
 
-          <Group title="공연 정보" description="홈 화면 위쪽 포스터 옆 정보표에 나와요. 비워 둔 줄은 보이지 않아요.">
+          <Group title="공연 정보" description="첫 화면과 공연 안내의 포스터 옆 정보표에 나와요. 비워 둔 줄은 보이지 않아요.">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="공연 제목" className="sm:col-span-2">
                 <input className={inputClass} {...text("title")} />
@@ -303,8 +303,8 @@ export default function AdminShowPage() {
             <button type="submit" disabled={saving} className="btn-primary min-w-[120px]">
               {saving ? "저장하는 중" : "저장"}
             </button>
-            <Link href="/" target="_blank" className="btn-ghost text-meta">
-              홈에서 보기
+            <Link href="/show" target="_blank" className="btn-ghost text-meta">
+              공연 안내에서 보기
             </Link>
             {message && (
               <p role="status" className="ml-auto text-right text-meta text-ink-2">

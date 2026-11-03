@@ -1,8 +1,4 @@
-// 공연 시리즈 이름. 세미콜론만 빨갛게 둔다.
-export default function Wordmark({ className = "text-[19px]" }: { className?: string }) {
-  return (
-    <span className={`font-extrabold tracking-[-0.04em] text-ink ${className}`}>
-      작전명<span className="text-brand-600">;</span>문
-    </span>
-  );
+// 공연 시리즈 이름. 첫 화면 제목과 같은 명조체로 쓴다. 색은 부모가 정한다.
+export default function Wordmark({ className = "text-[20px] text-ink" }: { className?: string }) {
+  return <span className={`font-display font-black tracking-[-0.05em] ${className}`}>작전명문</span>;
 }

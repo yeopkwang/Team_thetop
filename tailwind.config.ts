@@ -37,6 +37,7 @@ const config: Config = {
         kakao: "#FEE500",
       },
       fontFamily: {
+        display: ["var(--font-display)", '"Noto Serif KR"', '"AppleMyungjo"', "serif"],
         sans: [
           '"Pretendard Variable"',
           "Pretendard",

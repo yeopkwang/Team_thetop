@@ -79,7 +79,7 @@ function LoginPageContent() {
     <main className="page pb-16">
       <div className="mx-auto max-w-[400px] pt-12 lg:pt-20">
         <div className="text-center">
-          <Wordmark className="text-[32px]" />
+          <Wordmark className="text-[34px] text-ink" />
           <p className="mt-2 text-ui text-ink-3">밴드 반송 공연 예매</p>
         </div>
 

@@ -222,7 +222,7 @@ export default function BookingForm({ show, sessions }: { show: ShowProps; sessi
                   />
                   <span>
                     취소·환불 규정을 확인했고 동의해요. 규정은{" "}
-                    <Link href="/" className="font-semibold text-ink underline underline-offset-2">
+                    <Link href="/show" className="font-semibold text-ink underline underline-offset-2">
                       공연 안내의 판매 정보
                     </Link>
                     에 있어요.
