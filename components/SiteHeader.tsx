@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { apiFetch, getToken, readAdminRole, writeAdminRole } from "@/lib/api-client";
+import { apiFetch, getToken, readStaffLevel, writeStaffLevel } from "@/lib/api-client";
+import { staffLevel } from "@/lib/roles";
 import Wordmark from "./Wordmark";
 import { TicketIcon, UserIcon } from "./icons";
 import { useSlidingIndicator } from "./useSlidingIndicator";
@@ -12,7 +13,7 @@ type MeResponse = { user?: { roles?: string[] } };
 
 function useAuthState() {
   const [loggedIn, setLoggedIn] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -21,24 +22,24 @@ function useAuthState() {
       const hasToken = !!getToken();
       if (mounted) setLoggedIn(hasToken);
       if (!hasToken) {
-        if (mounted) setIsAdmin(false);
+        if (mounted) setIsStaff(false);
         return;
       }
 
-      const cached = readAdminRole();
+      const cached = readStaffLevel();
       if (cached?.fresh) {
-        if (mounted) setIsAdmin(cached.isAdmin);
+        if (mounted) setIsStaff(cached.level !== null);
         return;
       }
 
       try {
         const me = await apiFetch<MeResponse>("/auth/me");
         const roles = me?.user?.roles || [];
-        const admin = roles.includes("ADMIN") || roles.includes("SUPER_ADMIN");
-        writeAdminRole(admin);
-        if (mounted) setIsAdmin(admin);
+        const level = staffLevel(roles);
+        writeStaffLevel(level);
+        if (mounted) setIsStaff(level !== null);
       } catch {
-        if (mounted) setIsAdmin(false);
+        if (mounted) setIsStaff(false);
       }
     };
 
@@ -51,19 +52,19 @@ function useAuthState() {
     };
   }, []);
 
-  return { loggedIn, isAdmin };
+  return { loggedIn, isStaff };
 }
 
 export default function SiteHeader() {
   const pathname = usePathname();
-  const { loggedIn, isAdmin } = useAuthState();
+  const { loggedIn, isStaff } = useAuthState();
 
   const nav = [
     { href: "/show", label: "공연 안내", active: pathname.startsWith("/show") },
     { href: "/book", label: "예매하기", active: pathname.startsWith("/book") },
     { href: "/past", label: "지난 공연", active: pathname.startsWith("/past") },
     { href: "/myticket", label: "마이 티켓", active: pathname.startsWith("/myticket") },
-    ...(isAdmin ? [{ href: "/admin", label: "관리자", active: pathname.startsWith("/admin") }] : []),
+    ...(isStaff ? [{ href: "/admin", label: "관리자", active: pathname.startsWith("/admin") }] : []),
   ];
   const activeHref = nav.find((item) => item.active)?.href;
   const desktop = useSlidingIndicator(activeHref, [nav.length, pathname === "/"]);
@@ -72,7 +73,7 @@ export default function SiteHeader() {
   // 첫 화면은 버튼 두 개만 보이도록, 헤더를 투명하게 겹치고 마이 티켓·로그인만 남긴다.
   if (pathname === "/") {
     return (
-      <header className="absolute inset-x-0 top-0 z-40">
+      <header className="absolute inset-x-0 top-0 z-40 print:hidden">
         <div className="page flex h-16 items-center justify-end gap-5 text-meta font-semibold text-white/75">
           <Link href="/past" className="hover:text-white">
             지난 공연
@@ -83,7 +84,7 @@ export default function SiteHeader() {
           <Link href="/login" className="hover:text-white">
             {loggedIn ? "내 계정" : "로그인"}
           </Link>
-          {isAdmin && (
+          {isStaff && (
             <Link href="/admin" className="hover:text-white">
               관리자
             </Link>
@@ -94,7 +95,7 @@ export default function SiteHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-white">
+    <header className="sticky top-0 z-40 border-b border-line bg-white print:hidden">
       <div className="page flex h-[52px] items-center gap-8 lg:h-16">
         <Link href="/" className="shrink-0" aria-label="작전명문 첫 화면">
           <Wordmark />

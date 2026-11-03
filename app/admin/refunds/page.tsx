@@ -6,13 +6,24 @@ import { apiFetch, errorMessage, readAdminCache, writeAdminCache } from "@/lib/a
 import { bookingNumber, formatDateTime } from "@/lib/format";
 import { refundStatus } from "@/lib/status";
 
-type RefundItem = { id: string; status: string; createdAt: string; bookingId: string; name: string; showTitle: string };
+type RefundItem = {
+  id: string;
+  status: string;
+  createdAt: string;
+  bookingId: string;
+  name: string;
+  showTitle: string;
+  bank: string;
+  account: string;
+  holder: string;
+};
 
 export default function AdminRefundsPage() {
   const [items, setItems] = useState<RefundItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [copied, setCopied] = useState<string | null>(null);
 
   const load = async () => {
     try {
@@ -57,6 +68,16 @@ export default function AdminRefundsPage() {
     }
   };
 
+  const copyAccount = async (item: RefundItem) => {
+    try {
+      await navigator.clipboard.writeText(item.account.replace(/[^0-9]/g, ""));
+      setCopied(item.id);
+      window.setTimeout(() => setCopied(null), 2000);
+    } catch {
+      setMessage("복사하지 못했어요. 계좌번호를 직접 옮겨 적어 주세요.");
+    }
+  };
+
   const waiting = items.filter((r) => r.status !== "REFUNDED").length;
 
   return (
@@ -64,7 +85,9 @@ export default function AdminRefundsPage() {
       <h2 className="text-lead font-bold">
         환불 요청 <span className="text-brand-600">{loading ? "" : waiting}</span>
       </h2>
-      <p className="mt-1 text-meta text-ink-3">관객이 카카오톡으로 알려 준 계좌로 송금한 뒤 환불 완료를 눌러 주세요.</p>
+      <p className="mt-1 text-meta text-ink-3">
+        관객이 적은 계좌로 관람료를 송금한 뒤 환불 완료를 눌러 주세요. 환불 완료하면 계좌번호는 끝 네 자리만 남아요.
+      </p>
 
       {message && (
         <p role="status" className="mt-4 rounded-md bg-surface px-4 py-3 text-meta text-ink-2">
@@ -91,6 +114,24 @@ export default function AdminRefundsPage() {
                   <span className="mx-1.5 text-line-strong">|</span>
                   {formatDateTime(r.createdAt)} 요청
                 </p>
+                {r.account ? (
+                  <p className="mt-1.5 flex flex-wrap items-center gap-2 text-ui">
+                    <span className={r.status === "REFUNDED" ? "text-ink-3" : "font-semibold"}>
+                      {r.bank} {r.account} ({r.holder})
+                    </span>
+                    {r.status !== "REFUNDED" && (
+                      <button
+                        type="button"
+                        onClick={() => void copyAccount(r)}
+                        className="h-7 rounded border border-line-strong bg-white px-2 text-cap font-semibold text-ink-2 hover:text-ink"
+                      >
+                        {copied === r.id ? "복사됨" : "계좌 복사"}
+                      </button>
+                    )}
+                  </p>
+                ) : (
+                  r.status !== "REFUNDED" && <p className="mt-1.5 text-meta text-wait-700">계좌가 적혀 있지 않아요. 관객에게 따로 받아 주세요.</p>
+                )}
               </div>
               {r.status !== "REFUNDED" && (
                 <div className="flex shrink-0 flex-col items-end gap-1">

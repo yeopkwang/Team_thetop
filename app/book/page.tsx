@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import BookingForm from "@/components/BookingForm";
 import EmptyState from "@/components/EmptyState";
+import { configuredAppUrl } from "@/lib/app-url";
 import { performerNames } from "@/lib/credits";
 import { formatSessionDate } from "@/lib/format";
 import { getCurrentShow, getSessionAvailability } from "@/lib/show";
@@ -26,8 +27,10 @@ export default async function BookPage({ searchParams }: { searchParams: { sessi
   return (
     <BookingForm
       initialSessionId={searchParams.session}
+      appUrl={configuredAppUrl()}
       performers={performerNames(show.credits)}
       show={{
+        id: show.id,
         title: show.title,
         posterUrl: show.posterUrl,
         dateLabel: show.dateLabel,

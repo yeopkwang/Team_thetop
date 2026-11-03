@@ -1,5 +1,6 @@
 import type { Show } from "@prisma/client";
 import { won } from "@/lib/format";
+import { SITE } from "@/lib/site";
 
 type Fields = Pick<
   Show,
@@ -19,7 +20,7 @@ type Fields = Pick<
 // 판매정보 탭 맨 위의 상품 정보 표. 비어 있는 항목은 줄째 뺀다.
 export default function SalesInfoTable({ show, period }: { show: Fields; period: string }) {
   const rows: [string, React.ReactNode][] = [
-    ["주최", "밴드 반송"],
+    ["주최", SITE.band],
     [
       "고객문의",
       [show.contactName, show.contactTag].filter(Boolean).join(" ") || "",

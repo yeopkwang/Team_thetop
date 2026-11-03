@@ -35,6 +35,12 @@ export function bookingNumber(id: string) {
   return id.slice(-8).toUpperCase();
 }
 
+// 계좌번호를 끝 네 자리만 남기고 가린다. 123-456-7890 → ****7890
+export function maskAccount(account: string) {
+  const digits = account.replace(/[^0-9]/g, "");
+  return digits ? `****${digits.slice(-4)}` : "";
+}
+
 // 2027.02.21 (일)
 export function formatDate(date: Date | string) {
   const p = parts(date, { year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" });

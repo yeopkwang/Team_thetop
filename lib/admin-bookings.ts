@@ -2,6 +2,7 @@
 import { randomUUID } from "crypto";
 import { Prisma, RefundStatus, ReservationStatus, ShowStatus, TicketStatus } from "@prisma/client";
 import { logAudit } from "./audit";
+import { maskAccount } from "./format";
 import { HttpError } from "./http";
 import { prisma } from "./prisma";
 import { CLOSED_STATUSES, QUEUED_TX, expireOverdue, lockReservation, lockSession, seatsHeld } from "./reservations";
@@ -81,16 +82,18 @@ export async function cancelBookingByStaff(bookingId: string, reason: string, ac
   });
 }
 
-// 입장 확인: QR 토큰으로 티켓을 찾아 한 번만 입장 처리한다.
-export async function checkIn(qrToken: string, actorUserId: string) {
+// 입장 확인: QR 토큰(카메라)이나 예매 id(이름·예매번호로 찾아 누름)로 티켓을 찾아 한 번만 입장 처리한다.
+export async function checkIn(by: { qrToken?: string; bookingId?: string }, actorUserId: string) {
   return prisma.$transaction(async (tx) => {
-    const found = await tx.ticket.findUnique({ where: { qrToken }, select: { reservationId: true } });
-    if (!found) throw new HttpError(404, "없는 티켓이에요.");
+    const found = by.qrToken
+      ? await tx.ticket.findUnique({ where: { qrToken: by.qrToken }, select: { id: true, reservationId: true } })
+      : await tx.ticket.findUnique({ where: { reservationId: by.bookingId }, select: { id: true, reservationId: true } });
+    if (!found) throw new HttpError(404, by.qrToken ? "없는 티켓이에요." : "입금이 확인된 티켓이 없어요.");
 
     // 환불 요청과 동시에 들어와도, 같은 QR을 두 기기에서 동시에 찍어도 한 번만 통과하게 예매 행을 잠근다.
     await lockReservation(tx, found.reservationId);
     const ticket = await tx.ticket.findUniqueOrThrow({
-      where: { qrToken },
+      where: { id: found.id },
       include: {
         checkIn: true,
         reservation: {
@@ -114,7 +117,16 @@ export async function checkIn(qrToken: string, actorUserId: string) {
     if (ticket.checkIn) throw new HttpError(409, "이미 입장 처리된 티켓이에요.");
 
     const created = await tx.checkIn.create({ data: { ticketId: ticket.id } });
-    await logAudit({ action: "CHECKIN_CREATED", entityType: "CheckIn", entityId: created.id, actorUserId, after: { ticketId: ticket.id } }, tx);
+    await logAudit(
+      {
+        action: "CHECKIN_CREATED",
+        entityType: "Reservation",
+        entityId: reservation.id,
+        actorUserId,
+        after: { checkInId: created.id, method: by.qrToken ? "QR" : "이름·예매번호" },
+      },
+      tx
+    );
     return {
       checkedInAt: created.createdAt,
       bookingId: reservation.id,
@@ -137,16 +149,17 @@ export async function completeRefund(refundId: string, actorUserId: string) {
       data: { status: RefundStatus.REFUNDED },
     });
     if (updated.count === 0) throw new HttpError(409, "이미 환불 완료된 건이에요.");
+    // 송금이 끝났으니 계좌번호는 끝 네 자리만 남긴다(나중에 '어디로 보냈지?'를 확인할 만큼만).
+    await tx.refund.update({ where: { id: refundId }, data: { refundAccount: maskAccount(refund.refundAccount) } });
     await tx.reservation.update({ where: { id: refund.reservationId }, data: { status: ReservationStatus.REFUNDED } });
     await tx.ticket.updateMany({ where: { reservationId: refund.reservationId }, data: { status: TicketStatus.REVOKED } });
     await logAudit(
       {
         action: "REFUND_COMPLETED",
-        entityType: "Refund",
-        entityId: refundId,
+        entityType: "Reservation",
+        entityId: refund.reservationId,
         actorUserId,
-        before: { status: refund.status },
-        after: { status: RefundStatus.REFUNDED },
+        after: { refundId, bank: refund.refundBank, account: maskAccount(refund.refundAccount), holder: refund.refundHolder },
       },
       tx
     );
@@ -255,7 +268,7 @@ export async function listReservations(limit: number, cursor?: string) {
   };
 }
 
-// 환불 관리: 최근 요청부터.
+// 환불 관리: 최근 요청부터. 송금할 계좌를 같이 보여 준다(환불 완료 건은 끝 네 자리만 남아 있다).
 export async function listRefunds() {
   const rows = await prisma.refund.findMany({
     orderBy: { createdAt: "desc" },
@@ -263,6 +276,9 @@ export async function listRefunds() {
       id: true,
       status: true,
       createdAt: true,
+      refundBank: true,
+      refundAccount: true,
+      refundHolder: true,
       reservation: {
         select: { id: true, depositorName: true, user: { select: { name: true } }, session: { select: { show: { select: { title: true } } } } },
       },
@@ -275,5 +291,25 @@ export async function listRefunds() {
     bookingId: r.reservation.id,
     name: r.reservation.depositorName || r.reservation.user.name || "이름 없음",
     showTitle: r.reservation.session.show.title,
+    bank: r.refundBank,
+    account: r.refundAccount,
+    holder: r.refundHolder,
   }));
+}
+
+// 입장 확인 화면의 명단: 판매 중인 공연에서 입금이 확인된 관객. 이름·예매번호로 찾아 입장 처리할 때 쓴다.
+// 100~200명 규모라 한 번에 내려 주고 화면에서 거른다.
+export async function listCheckInTickets() {
+  const rows = await prisma.reservation.findMany({
+    where: { status: ReservationStatus.CONFIRMED, session: { show: { status: ShowStatus.ON_SALE } }, ticket: { status: TicketStatus.ACTIVE } },
+    select: { id: true, depositorName: true, user: { select: { name: true } }, ticket: { select: { checkIn: { select: { createdAt: true } } } } },
+  });
+  return rows
+    .map((r) => ({
+      bookingId: r.id,
+      name: r.depositorName || r.user.name || "이름 없음",
+      kakaoName: r.user.name,
+      checkedInAt: r.ticket?.checkIn?.createdAt ?? null,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "ko"));
 }

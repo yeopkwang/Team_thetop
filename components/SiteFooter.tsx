@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SITE } from "@/lib/site";
 import Wordmark from "./Wordmark";
 
 export default function SiteFooter() {
@@ -8,21 +10,20 @@ export default function SiteFooter() {
   if (usePathname() === "/") return null;
 
   return (
-    <footer className="border-t border-line bg-surface">
+    <footer className="border-t border-line bg-surface print:hidden">
       <div className="page space-y-2 py-8 text-meta text-ink-3">
         <Wordmark className="text-[16px] text-ink-2" />
-        <p>동탄 반송고등학교 재학생과 졸업생이 함께 만드는 밴드 반송의 연례 공연입니다.</p>
+        <p>{SITE.about}</p>
         <p>
           공연 소식은 인스타그램{" "}
-          <a
-            href="https://www.instagram.com/band.bansong/"
-            target="_blank"
-            rel="noreferrer"
-            className="font-semibold text-ink-2 underline-offset-2 hover:underline"
-          >
-            @band.bansong
+          <a href={SITE.instagram.url} target="_blank" rel="noreferrer" className="font-semibold text-ink-2 underline-offset-2 hover:underline">
+            {SITE.instagram.handle}
           </a>
-          에서 볼 수 있어요.
+          에서 볼 수 있어요. 궁금한 점은{" "}
+          <Link href="/help" className="font-semibold text-ink-2 underline-offset-2 hover:underline">
+            자주 묻는 질문
+          </Link>
+          에 모아 뒀어요.
         </p>
       </div>
     </footer>

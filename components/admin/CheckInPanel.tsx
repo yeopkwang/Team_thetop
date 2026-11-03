@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CameraIcon, CheckIcon } from "../icons";
 import { apiFetch, errorMessage } from "@/lib/api-client";
 import { bookingNumber, formatDateTime } from "@/lib/format";
 
 type CheckInResponse = { checkedInAt: string; bookingId: string; name: string; kakaoName: string | null; showTitle: string };
+type TicketRow = { bookingId: string; name: string; kakaoName: string | null; checkedInAt: string | null };
 
 type Html5QrcodeInstance = {
   start: (
@@ -34,9 +35,12 @@ const loadHtml5QrcodeCtor = async (): Promise<Html5QrcodeCtor> => {
 
 type ScanOutcome = { ok: true; data: CheckInResponse } | { ok: false; message: string };
 
-// 입장 확인: 카메라로 관객의 QR을 찍거나 토큰을 직접 적는다.
+const SEARCH_LIMIT = 8;
+
+// 입장 확인: 카메라로 관객의 QR을 찍는다. QR이 안 되면(휴대폰이 꺼졌거나 화면이 깨졌을 때) 이름·예매번호로 찾아 누른다.
 export default function CheckInPanel() {
-  const [scanToken, setScanToken] = useState("");
+  const [query, setQuery] = useState("");
+  const [tickets, setTickets] = useState<TicketRow[] | null>(null);
   const [outcome, setOutcome] = useState<ScanOutcome | null>(null);
   const [scannerOn, setScannerOn] = useState(false);
   const [cameraMessage, setCameraMessage] = useState("");
@@ -44,23 +48,48 @@ export default function CheckInPanel() {
   const scannerRef = useRef<Html5QrcodeInstance | null>(null);
   const scanLockRef = useRef(false);
 
+  const loadTickets = async () => {
+    try {
+      const data = await apiFetch<{ tickets: TicketRow[] }>("/admin/checkin");
+      setTickets(data.tickets);
+    } catch {
+      // 명단을 못 받아도 QR 입장 확인은 쓸 수 있다
+    }
+  };
+
   useEffect(() => {
+    void loadTickets();
     return () => {
       void stopScanner();
     };
   }, []);
 
-  const processCheckIn = async (qrToken: string) => {
-    if (!qrToken) return;
+  const processCheckIn = async (by: { qrToken: string } | { bookingId: string }) => {
     setOutcome(null);
     try {
-      const data = await apiFetch<CheckInResponse>("/admin/checkin", { method: "POST", bodyJson: { qrToken } });
+      const data = await apiFetch<CheckInResponse>("/admin/checkin", { method: "POST", bodyJson: by });
       setOutcome({ ok: true, data });
-      setScanToken("");
+      setQuery("");
     } catch (error: unknown) {
       setOutcome({ ok: false, message: errorMessage(error, "입장 확인을 처리하지 못했어요.") });
     }
+    void loadTickets();
   };
+
+  const matches = useMemo(() => {
+    const q = query.replace(/\s+/g, "").toLowerCase();
+    if (!q || !tickets) return [];
+    return tickets.filter((t) =>
+      [t.name, t.kakaoName || "", bookingNumber(t.bookingId)].some((v) => v.replace(/\s+/g, "").toLowerCase().includes(q))
+    );
+  }, [query, tickets]);
+
+  const manualCheckIn = (t: TicketRow) => {
+    if (!window.confirm(`${t.name}님(예매번호 ${bookingNumber(t.bookingId)})을 입장 처리할까요? 본인인지 이름을 확인해 주세요.`)) return;
+    void processCheckIn({ bookingId: t.bookingId });
+  };
+
+  const entered = tickets?.filter((t) => t.checkedInAt).length ?? 0;
 
   const stopScanner = async () => {
     setScannerOn(false);
@@ -104,7 +133,7 @@ export default function CheckInPanel() {
         if (!raw) return;
         scanLockRef.current = true;
         await stopScanner();
-        await processCheckIn(raw);
+        await processCheckIn({ qrToken: raw });
       };
 
       const config = { fps: 10, qrbox: { width: 220, height: 220 } };
@@ -123,9 +152,16 @@ export default function CheckInPanel() {
 
   return (
     <section aria-labelledby="checkin-title">
-      <h2 id="checkin-title" className="text-lead font-bold">
-        입장 확인
-      </h2>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id="checkin-title" className="text-lead font-bold">
+          입장 확인
+        </h2>
+        {tickets && (
+          <p className="text-meta tabular-nums text-ink-3">
+            입장 <strong className="font-semibold text-ink">{entered}</strong> / {tickets.length}명
+          </p>
+        )}
+      </div>
       <p className="mt-1 text-meta text-ink-3">관객의 마이 티켓 QR을 카메라로 찍어 주세요.</p>
 
       <div className="relative mt-4 aspect-square w-full max-w-[400px] overflow-hidden rounded-lg bg-ink">
@@ -179,29 +215,48 @@ export default function CheckInPanel() {
         </div>
       )}
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void processCheckIn(scanToken.trim());
-        }}
-        className="mt-6 max-w-[400px]"
-      >
-        <label htmlFor="qr-token" className="text-meta font-semibold text-ink-2">
-          QR이 안 찍히면 토큰을 직접 입력
+      <div className="mt-6 max-w-[400px]">
+        <label htmlFor="checkin-search" className="text-meta font-semibold text-ink-2">
+          QR이 안 되면 이름이나 예매번호로 찾기
         </label>
-        <div className="mt-1.5 flex gap-2">
-          <input
-            id="qr-token"
-            value={scanToken}
-            onChange={(e) => setScanToken(e.target.value)}
-            placeholder="QR 아래 적힌 토큰"
-            className="field"
-          />
-          <button type="submit" disabled={!scanToken.trim()} className="btn-secondary shrink-0">
-            확인
-          </button>
-        </div>
-      </form>
+        <input
+          id="checkin-search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="입금자명, 카카오 이름, 예매번호"
+          className="field mt-1.5"
+          autoComplete="off"
+        />
+        {query.trim() && (
+          <ul className="mt-2 divide-y divide-line rounded-lg border border-line">
+            {tickets === null && <li className="px-4 py-3 text-meta text-ink-3">명단을 불러오지 못했어요. 새로고침해 주세요.</li>}
+            {tickets !== null && matches.length === 0 && (
+              <li className="px-4 py-3 text-meta text-ink-3">입금이 확인된 관객 중에 없어요. 입금 확인 목록이나 예매자 목록을 확인해 주세요.</li>
+            )}
+            {matches.slice(0, SEARCH_LIMIT).map((t) => (
+              <li key={t.bookingId} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-ui font-semibold">{t.name}</p>
+                  <p className="text-cap text-ink-3">
+                    {bookingNumber(t.bookingId)}
+                    {t.kakaoName && t.kakaoName !== t.name && `, 카카오 ${t.kakaoName}`}
+                  </p>
+                </div>
+                {t.checkedInAt ? (
+                  <span className="shrink-0 text-cap text-ink-3">{formatDateTime(t.checkedInAt)} 입장</span>
+                ) : (
+                  <button type="button" onClick={() => manualCheckIn(t)} className="btn-secondary btn-sm shrink-0">
+                    입장 처리
+                  </button>
+                )}
+              </li>
+            ))}
+            {matches.length > SEARCH_LIMIT && (
+              <li className="px-4 py-2.5 text-cap text-ink-3">{matches.length - SEARCH_LIMIT}명이 더 있어요. 더 자세히 적어 주세요.</li>
+            )}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }

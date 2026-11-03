@@ -1,7 +1,18 @@
 import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { BUSY_ERROR, HttpError, SERVER_ERROR, readBody, route } from "@/lib/http";
-import { batchConfirmInput, bookingInput, checkInInput, loginInput, staffCancelInput } from "@/lib/inputs";
+import {
+  accountCreateInput,
+  batchConfirmInput,
+  bookingInput,
+  checkInInput,
+  depositorInput,
+  loginInput,
+  passwordChangeInput,
+  passwordResetInput,
+  refundInput,
+  staffCancelInput,
+} from "@/lib/inputs";
 
 const req = (body: string) => new Request("http://x/api", { method: "POST", body, headers: { "Content-Type": "application/json" } });
 const errorOf = async (p: Promise<unknown>) => {
@@ -21,7 +32,7 @@ describe("readBody", () => {
   });
   it("빈 본문·null도 400(빈 객체로 보고 필수값 문구)", async () => {
     expect((await errorOf(readBody(req(""), checkInInput))).message).toBe("요청 내용을 읽지 못했어요.");
-    expect((await errorOf(readBody(req("null"), checkInInput))).message).toBe("QR을 찍거나 토큰을 적어 주세요.");
+    expect((await errorOf(readBody(req("null"), checkInInput))).message).toBe("QR을 찍거나 관객을 골라 주세요.");
   });
 });
 
@@ -94,5 +105,51 @@ describe("운영진 입력", () => {
   it("로그인: 아이디 앞뒤 공백은 지우고, 빈 값은 거부", () => {
     expect(loginInput.parse({ id: " admin ", password: "pw" }).id).toBe("admin");
     expect(loginInput.safeParse({ id: "admin" }).success).toBe(false);
+  });
+});
+
+describe("새 입력: 환불 계좌 · 입금자명 · 입장 · 계정", () => {
+  const ok = { reservationId: "r1", bank: " 카카오뱅크 ", account: "3333 01-234567", holder: "홍길동" };
+  it("환불 계좌: 공백을 지우고 숫자와 -만 받는다", () => {
+    expect(refundInput.parse(ok)).toEqual({ reservationId: "r1", bank: "카카오뱅크", account: "333301-234567", holder: "홍길동" });
+    expect(refundInput.safeParse({ ...ok, account: "3333-01-23456a" }).error?.issues[0].message).toBe("계좌번호는 숫자와 -만 적어 주세요.");
+  });
+  it("환불 계좌: 숫자 6~20자리(경계값)", () => {
+    expect(refundInput.safeParse({ ...ok, account: "12345" }).success).toBe(false);
+    expect(refundInput.safeParse({ ...ok, account: "123-456" }).success).toBe(true);
+    expect(refundInput.safeParse({ ...ok, account: "1".repeat(20) }).success).toBe(true);
+    expect(refundInput.safeParse({ ...ok, account: "1".repeat(21) }).success).toBe(false);
+    expect(refundInput.safeParse({ ...ok, account: "------" }).success).toBe(false);
+  });
+  it("환불 계좌: 은행·예금주가 비면 그 칸을 알려 준다", () => {
+    expect(refundInput.safeParse({ ...ok, bank: " " }).error?.issues[0].message).toBe("환불받을 은행을 적어 주세요.");
+    expect(refundInput.safeParse({ reservationId: "r1" }).success).toBe(false);
+  });
+  it("입금자명 고치기: 예매 때와 같은 규칙(공백 정리, 20자)", () => {
+    expect(depositorInput.parse({ depositorName: "  김   민지 " })).toEqual({ depositorName: "김 민지" });
+    expect(depositorInput.safeParse({ depositorName: "가".repeat(21) }).success).toBe(false);
+  });
+  it("입장: QR 토큰이나 예매 id 둘 중 하나는 있어야 한다", () => {
+    expect(checkInInput.safeParse({ qrToken: "abc" }).success).toBe(true);
+    expect(checkInInput.safeParse({ bookingId: "r1" }).success).toBe(true);
+    expect(checkInInput.safeParse({ qrToken: " ", bookingId: "" }).success).toBe(false);
+  });
+  it("계정 만들기: 아이디는 소문자로 바꾸고 3~30자 영문·숫자·._-", () => {
+    const base = { username: "Door.Staff", name: "입구 스태프", password: "0123456789", role: "STAFF" };
+    expect(accountCreateInput.parse(base).username).toBe("door.staff");
+    expect(accountCreateInput.safeParse({ ...base, username: "ab" }).success).toBe(false);
+    expect(accountCreateInput.safeParse({ ...base, username: "a".repeat(31) }).success).toBe(false);
+    expect(accountCreateInput.safeParse({ ...base, username: "김스태프" }).error?.issues[0].message).toContain("영문 소문자");
+  });
+  it("계정 만들기: 비밀번호 10자(경계값), 권한은 관리자·스태프만", () => {
+    const base = { username: "door", name: "입구", password: "0123456789", role: "STAFF" };
+    expect(accountCreateInput.safeParse({ ...base, password: "012345678" }).error?.issues[0].message).toBe("임시 비밀번호는 10자 이상이어야 해요.");
+    expect(accountCreateInput.safeParse({ ...base, role: "SUPER_ADMIN" }).success).toBe(false);
+    expect(accountCreateInput.safeParse({ ...base, role: "USER" }).success).toBe(false);
+    expect(accountCreateInput.safeParse({ ...base, role: "ADMIN" }).success).toBe(true);
+  });
+  it("비밀번호 바꾸기: 새 비밀번호 10자 이상", () => {
+    expect(passwordChangeInput.safeParse({ current: "x", next: "short" }).error?.issues[0].message).toBe("새 비밀번호는 10자 이상이어야 해요.");
+    expect(passwordResetInput.safeParse({ password: "0123456789" }).success).toBe(true);
   });
 });

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { menuItemFor } from "@/components/admin/StaffLevel";
 import { parseCredits, performerNames } from "@/lib/credits";
+import { maskAccount } from "@/lib/format";
 import { LOGIN_ERRORS, loginErrorMessage } from "@/lib/login-errors";
 import { paymentDeadline } from "@/lib/reservations";
+import { staffLevel } from "@/lib/roles";
 import { sameOriginPath } from "@/lib/safe-next";
 import { isClosedStatus, refundStatus, reservationStatus } from "@/lib/status";
 
@@ -69,5 +72,31 @@ describe("상태 문구", () => {
     expect(reservationStatus("WHAT")).toEqual({ label: "WHAT", tone: "muted" });
     expect(refundStatus("PENDING").label).toBe("환불 대기");
     expect(refundStatus("X").label).toBe("X");
+  });
+});
+
+describe("운영진 권한", () => {
+  it("관리자 > 스태프 > 아님", () => {
+    expect(staffLevel(["USER", "ADMIN"])).toBe("admin");
+    expect(staffLevel(["SUPER_ADMIN"])).toBe("admin");
+    expect(staffLevel(["STAFF"])).toBe("staff");
+    expect(staffLevel(["USER"])).toBeNull();
+    expect(staffLevel([])).toBeNull();
+  });
+  it("관리자 메뉴: 가장 길게 맞는 메뉴를 고른다", () => {
+    expect(menuItemFor("/admin")?.href).toBe("/admin");
+    expect(menuItemFor("/admin/reservations/print")?.href).toBe("/admin/reservations");
+    expect(menuItemFor("/admin/shows/new")?.staff).toBe(false);
+    expect(menuItemFor("/admin/accounts")?.staff).toBe(true);
+    expect(menuItemFor("/admin/nope")).toBeUndefined();
+  });
+});
+
+describe("계좌번호 가리기", () => {
+  it("끝 네 자리만 남긴다", () => {
+    expect(maskAccount("3333-01-234567")).toBe("****4567");
+    expect(maskAccount("123")).toBe("****123");
+    expect(maskAccount("")).toBe("");
+    expect(maskAccount("****4567")).toBe("****4567");
   });
 });

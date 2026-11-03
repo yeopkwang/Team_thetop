@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { apiFetch, errorMessage } from "@/lib/api-client";
+import { apiDownload, apiFetch, errorMessage } from "@/lib/api-client";
 import { performerNames } from "@/lib/credits";
 import { fromKstInput, toKstInput } from "@/lib/format";
 import { normalizeSetlist } from "@/lib/setlist";
+import { SITE } from "@/lib/site";
 import { SHOW_STATUS, type ShowStatusKey } from "@/lib/status";
+import ReadinessChecklist from "./ReadinessChecklist";
 import SetlistEditor, { fromEditSetlist, setlistColumns, toEditSetlist, type EditSection } from "./SetlistEditor";
 
 type FormState = {
@@ -138,6 +140,8 @@ export default function ShowForm({ showId }: { showId?: string }) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [reservedQty, setReservedQty] = useState(0);
+  // 마지막으로 저장된 상태. 이미 판매 중인 공연은 공연 시각이 지나도 저장할 수 있어야 해서(공연 당일) 따로 둔다.
+  const [savedStatus, setSavedStatus] = useState<ShowStatusKey | null>(null);
   const [carriedFrom, setCarriedFrom] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -151,6 +155,7 @@ export default function ShowForm({ showId }: { showId?: string }) {
           const { show } = await apiFetch<{ show: ShowDetail }>(`/admin/shows/${showId}`);
           setForm(toForm(show));
           setReservedQty(show.reservedQty);
+          setSavedStatus(show.status);
           return;
         }
         // 새 공연: 가장 최근 공연의 장소·입금·판매 안내를 미리 채운다.
@@ -196,6 +201,7 @@ export default function ShowForm({ showId }: { showId?: string }) {
         const { show } = await apiFetch<{ show: ShowDetail }>(`/admin/shows/${showId}`, { method: "PUT", bodyJson: body });
         setForm(toForm(show));
         setReservedQty(show.reservedQty);
+        setSavedStatus(show.status);
         setMessage("저장했어요.");
       } else {
         const { id } = await apiFetch<{ id: string }>("/admin/shows", { method: "POST", bodyJson: body });
@@ -222,6 +228,16 @@ export default function ShowForm({ showId }: { showId?: string }) {
       setMessage(errorMessage(error, "포스터를 올리지 못했어요."));
     } finally {
       setUploading(false);
+    }
+  };
+
+  const downloadAttendees = async () => {
+    if (!showId) return;
+    setMessage("");
+    try {
+      await apiDownload(`/admin/attendees?show=${showId}&format=csv`, "예매자 명단.csv");
+    } catch (error: unknown) {
+      setMessage(errorMessage(error, "명단을 내려받지 못했어요."));
     }
   };
 
@@ -273,6 +289,12 @@ export default function ShowForm({ showId }: { showId?: string }) {
         </div>
         {form.status === "ON_SALE" && (
           <p className="text-meta text-wait-700">지금 판매 중인 다른 공연이 있으면, 저장할 때 그 공연은 지난 공연으로 옮겨져요.</p>
+        )}
+        {form.status !== "ENDED" && (
+          <ReadinessChecklist
+            alreadyOnSale={savedStatus === "ON_SALE"}
+            show={{ ...form, posterUrl: form.posterUrl || null, sessionDate: form.sessionDate ? fromKstInput(form.sessionDate) : null }}
+          />
         )}
       </Group>
 
@@ -388,7 +410,7 @@ export default function ShowForm({ showId }: { showId?: string }) {
             <input className="field" placeholder="대표 홍길동" {...text("contactName")} />
           </Field>
           <Field label="문의 (SNS 등)">
-            <input className="field" placeholder="@band.bansong" {...text("contactTag")} />
+            <input className="field" placeholder={SITE.instagram.handle} {...text("contactTag")} />
           </Field>
           <Field label="공지사항" className="sm:col-span-2" hint="공연정보 탭 맨 위에 나와요.">
             <textarea rows={2} className="field" {...text("notice")} />
@@ -464,6 +486,19 @@ export default function ShowForm({ showId }: { showId?: string }) {
           <textarea rows={20} className="field text-ui leading-7" {...text("salesText")} />
         </Field>
       </Group>
+
+      {showId && (
+        <Group title="예매자 명단" description="이 공연의 예매자를 엑셀로 받거나, 입금 확인된 관객을 이름순으로 인쇄해요.">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => void downloadAttendees()} className="btn-secondary btn-sm">
+              엑셀로 받기
+            </button>
+            <Link href={`/admin/reservations/print?show=${showId}`} className="btn-secondary btn-sm">
+              현장용 명단 인쇄
+            </Link>
+          </div>
+        </Group>
+      )}
 
       {showId && (
         <section className="border-t border-line py-8">

@@ -3,14 +3,17 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ApiError, apiFetch, errorMessage, getToken } from "@/lib/api-client";
+import { salesOpenEvent } from "@/lib/calendar";
 import { formatSessionDate, won } from "@/lib/format";
 import { salesState, untilText } from "@/lib/sales";
 import { isClosedStatus, reservationStatus } from "@/lib/status";
+import CalendarLinks from "./CalendarLinks";
 import { KakaoIcon } from "./icons";
 import Poster from "./show/Poster";
 import { useSalesClock } from "./useSalesClock";
 
 type ShowProps = {
+  id: string;
   title: string;
   posterUrl: string | null;
   dateLabel: string;
@@ -48,11 +51,13 @@ export default function BookingForm({
   sessions,
   performers,
   initialSessionId,
+  appUrl,
 }: {
   show: ShowProps;
   sessions: SessionProps[];
   performers: string[];
   initialSessionId?: string;
+  appUrl: string;
 }) {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
   const [existing, setExisting] = useState<{ status: string } | null>(null);
@@ -148,7 +153,19 @@ export default function BookingForm({
                 <p className="text-meta text-white/70">티켓 오픈 {formatSessionDate(show.salesOpenAt)}</p>
                 <p className="mt-0.5 text-h2 font-bold tabular-nums">{untilText(show.salesOpenAt, now)}</p>
                 <p className="mt-1 text-meta text-white/70">시각이 되면 이 화면에서 예매 버튼이 바로 열려요. 미리 아래 내용을 채워 두세요.</p>
+                <div className="mt-3 [&_.btn-ghost]:text-white/80 [&_.btn-secondary]:border-white/30 [&_.btn-secondary]:bg-transparent [&_.btn-secondary]:text-white">
+                  <CalendarLinks
+                    icsHref="/api/calendar?type=open"
+                    event={salesOpenEvent({ ...show, salesOpenAt: new Date(show.salesOpenAt) }, appUrl)!}
+                    label="캘린더에 오픈 알림 추가"
+                  />
+                </div>
               </div>
+            )}
+            {state === "soldout" && (
+              <p className="rounded-lg bg-surface p-4 text-ui text-ink-2">
+                지금은 매진이에요. 입금 기한이 지나거나 취소·환불된 예매가 생기면 좌석이 다시 열려요.
+              </p>
             )}
             {existing && (
               <div className="flex flex-col gap-3 rounded-lg border border-brand-200 bg-brand-50 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -366,6 +383,13 @@ export default function BookingForm({
                     에 있어요.
                   </span>
                 </label>
+                <p className="text-cap text-ink-3">
+                  입금·환불·입장이 궁금하면{" "}
+                  <Link href="/help" className="font-semibold text-ink-2 underline underline-offset-2">
+                    자주 묻는 질문
+                  </Link>
+                  을 봐 주세요.
+                </p>
 
                 <button type="button" onClick={submit} disabled={!ready || submitting} className="btn-primary btn-lg hidden w-full lg:flex">
                   {submitLabel}

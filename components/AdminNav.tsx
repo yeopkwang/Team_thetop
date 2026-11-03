@@ -2,25 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ADMIN_MENU, menuItemFor, useStaffLevel } from "./admin/StaffLevel";
 import { useSlidingIndicator } from "./useSlidingIndicator";
-
-const ITEMS = [
-  { href: "/admin", label: "입금·입장 확인" },
-  { href: "/admin/reservations", label: "예매자 목록" },
-  { href: "/admin/refunds", label: "환불 관리" },
-  { href: "/admin/shows", label: "공연 관리" },
-];
 
 export default function AdminNav() {
   const pathname = usePathname();
-  const isActive = (href: string) => (href === "/admin" ? pathname === "/admin" : pathname.startsWith(href));
-  const indicator = useSlidingIndicator(ITEMS.find((item) => isActive(item.href))?.href);
+  const level = useStaffLevel();
+  const items = ADMIN_MENU.filter((item) => level === "admin" || item.staff);
+  const activeHref = menuItemFor(pathname)?.href;
+  const indicator = useSlidingIndicator(activeHref);
 
   return (
-    <nav aria-label="관리 메뉴" className="-mx-4 overflow-x-auto border-b border-line px-4 md:-mx-6 md:px-6 lg:mx-0 lg:px-0">
+    <nav aria-label="관리 메뉴" className="-mx-4 overflow-x-auto border-b border-line px-4 md:-mx-6 md:px-6 lg:mx-0 lg:px-0 print:hidden">
       <div ref={indicator.containerRef} className="relative flex w-max gap-6">
-        {ITEMS.map((item) => {
-          const active = isActive(item.href);
+        {items.map((item) => {
+          const active = item.href === activeHref;
           return (
             <Link
               key={item.href}

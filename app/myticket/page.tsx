@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import EmptyState from "@/components/EmptyState";
 import PaymentGuide from "@/components/ticket/PaymentGuide";
+import RefundRequestForm from "@/components/ticket/RefundRequestForm";
 import TicketStub from "@/components/ticket/TicketStub";
+import VisitGuide from "@/components/ticket/VisitGuide";
 import { ApiError, apiFetch, errorMessage, getToken } from "@/lib/api-client";
 
 type Booking = {
@@ -15,20 +17,27 @@ type Booking = {
   expiresAt: string;
   depositorName: string;
   cancelReason: string;
+  startsAt: string;
 };
 type Ticket = { code: string; checkedInAt: string | null };
+type Refund = { bank: string; account: string; holder: string };
 type ShowSummary = {
+  id: string;
   title: string;
   dateLabel: string;
   timeLabel: string;
+  timeSubLabel: string;
   venue: string;
+  venueAddress: string;
+  contactName: string;
+  contactTag: string;
   price: number;
   paymentBank: string;
   paymentAccount: string;
   paymentHolder: string;
   refundContact: string;
 };
-type Dashboard = { booking: Booking | null; ticket: Ticket | null; show: ShowSummary | null };
+type Dashboard = { booking: Booking | null; ticket: Ticket | null; show: ShowSummary | null; refund: Refund | null };
 
 type View = "loading" | "login" | "error" | "ready";
 
@@ -43,6 +52,7 @@ export default function MyTicketPage() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [qrImage, setQrImage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [justBooked, setJustBooked] = useState(false);
 
@@ -90,16 +100,16 @@ export default function MyTicketPage() {
     };
   }, [ticket?.code]);
 
-  const act = async (confirmText: string, path: string, body: Record<string, unknown> | undefined, done: string) => {
-    if (!window.confirm(confirmText)) return;
+  const cancelBooking = async (bookingId: string) => {
+    if (!window.confirm("예매를 취소할까요? 좌석이 다른 분께 돌아가요.")) return;
     setBusy(true);
     setMessage("");
     try {
-      await apiFetch(path, { method: "POST", bodyJson: body ?? {} });
-      setMessage(done);
+      await apiFetch(`/bookings/${bookingId}/cancel`, { method: "POST", bodyJson: {} });
+      setMessage("예매를 취소했어요.");
       await load();
     } catch (error: unknown) {
-      setMessage(errorMessage(error, "처리하지 못했어요."));
+      setMessage(errorMessage(error, "취소하지 못했어요."));
     } finally {
       setBusy(false);
     }
@@ -145,12 +155,13 @@ export default function MyTicketPage() {
       </EmptyState>
     );
   } else {
-    const { booking, show } = data;
+    const { booking, show, refund } = data;
     // 운영진이 취소한 예매는 사유를 함께 보여 준다.
     const closed =
       booking.status === "CANCELLED" && booking.cancelReason
         ? `운영진이 예매를 취소했어요. 사유: ${booking.cancelReason}`
         : CLOSED_MESSAGES[booking.status];
+    const live = booking.status === "PAYMENT_PENDING" || booking.status === "CONFIRMED";
 
     body = (
       <div className="mx-auto max-w-[400px] space-y-4">
@@ -159,26 +170,19 @@ export default function MyTicketPage() {
             예매가 접수됐어요. 아래 계좌로 입금하면 예매가 완료돼요.
           </p>
         )}
-        {booking.status === "PAYMENT_PENDING" && <PaymentGuide show={show} booking={booking} />}
+        {booking.status === "PAYMENT_PENDING" && <PaymentGuide show={show} booking={booking} onChanged={load} />}
 
-        <TicketStub
-          show={show}
-          booking={booking}
-          ticketCode={ticket?.code || ""}
-          checkedInAt={ticket?.checkedInAt || null}
-          qrImage={qrImage}
-        >
+        <TicketStub show={show} booking={booking} checkedInAt={ticket?.checkedInAt || null} qrImage={qrImage}>
           {booking.status === "REFUND_PENDING" && (
-            <p className="text-center text-ui text-ink-2">
-              환불을 요청했어요.{" "}
-              {show.refundContact ? (
-                <>
-                  <strong className="font-semibold text-ink">{show.refundContact}</strong>로 카카오톡을 보내 주시면 환불해 드려요.
-                </>
-              ) : (
-                "공연 문의처로 연락해 주세요."
+            <div className="space-y-1 text-center text-ui text-ink-2">
+              <p>환불을 요청했어요. 운영진이 송금하면 환불 완료로 바뀌어요.</p>
+              {refund?.account && (
+                <p className="text-meta">
+                  받을 계좌: {refund.bank} {refund.account} ({refund.holder})
+                </p>
               )}
-            </p>
+              {show.refundContact && <p className="text-meta">문의: {show.refundContact}</p>}
+            </div>
           )}
           {closed && (
             <div className="text-center">
@@ -192,42 +196,53 @@ export default function MyTicketPage() {
 
         {booking.status === "PAYMENT_PENDING" && (
           <div className="text-center">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                void act("예매를 취소할까요? 좌석이 다른 분께 돌아가요.", `/bookings/${booking.id}/cancel`, undefined, "예매를 취소했어요.")
-              }
-              className="btn-ghost text-meta"
-            >
+            <button type="button" disabled={busy} onClick={() => void cancelBooking(booking.id)} className="btn-ghost text-meta">
               예매 취소
             </button>
           </div>
         )}
-        {booking.status === "CONFIRMED" && !ticket?.checkedInAt && (
-          <div className="text-center">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                void act(
-                  "환불을 요청할까요? 요청하면 이 티켓으로 입장할 수 없어요.",
-                  "/refunds/request",
-                  { reservationId: booking.id },
-                  "환불을 요청했어요."
-                )
-              }
-              className="btn-ghost text-meta"
-            >
-              환불 요청
-            </button>
-          </div>
-        )}
+        {booking.status === "CONFIRMED" &&
+          !ticket?.checkedInAt &&
+          (refundOpen ? (
+            <RefundRequestForm
+              bookingId={booking.id}
+              defaultHolder={booking.depositorName}
+              onCancel={() => setRefundOpen(false)}
+              onDone={async (done) => {
+                setRefundOpen(false);
+                setMessage(done);
+                await load();
+              }}
+            />
+          ) : (
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setRefundOpen(true);
+                  setMessage("");
+                }}
+                className="btn-ghost text-meta"
+              >
+                환불 요청
+              </button>
+            </div>
+          ))}
         {message && (
           <p role="status" className="text-center text-meta text-ink-2">
             {message}
           </p>
         )}
+
+        {live && <VisitGuide show={show} startsAt={booking.startsAt} appUrl={window.location.origin} />}
+
+        <p className="text-center text-meta text-ink-3">
+          입금·환불·입장이 궁금하면{" "}
+          <Link href="/help" className="font-semibold text-ink-2 underline underline-offset-2">
+            자주 묻는 질문
+          </Link>
+          을 봐 주세요.
+        </p>
       </div>
     );
   }

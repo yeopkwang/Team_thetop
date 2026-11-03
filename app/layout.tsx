@@ -4,6 +4,7 @@ import type { Metadata, Viewport } from "next";
 import { Black_Han_Sans } from "next/font/google";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
+import { SITE } from "@/lib/site";
 
 // 로고와 첫 화면 제목에만 쓰는 굵은 제목체. 한글 조각 파일이 많아서 미리 불러오지는 않는다.
 const display = Black_Han_Sans({
@@ -16,7 +17,7 @@ const display = Black_Han_Sans({
 
 export const metadata: Metadata = {
   title: { default: "작전명문 공연 예매", template: "%s | 작전명문" },
-  description: "밴드 반송 연례 공연의 예매, 입금 안내, 모바일 QR 티켓",
+  description: `${SITE.band} 연례 공연의 예매, 입금 안내, 모바일 QR 티켓`,
 };
 
 export const viewport: Viewport = {

@@ -2,8 +2,10 @@ import { Prisma, ReservationStatus, ShowStatus } from "@prisma/client";
 import { z } from "zod";
 import { logAudit } from "./audit";
 import { HttpError } from "./http";
+import { LOCK_KEYS, advisoryLock } from "./locks";
 import { prisma } from "./prisma";
 import { SEAT_HOLDING_STATUSES, expireOverdue, lockSession, paymentDeadline, seatsHeld } from "./reservations";
+import { saleBlockers } from "./readiness";
 import { normalizeSetlist } from "./setlist";
 
 const text = z.string({ invalid_type_error: "글자로 적어 주세요." }).trim().max(10000, "안내문은 10,000자 안으로 적어 주세요.").default("");
@@ -69,6 +71,15 @@ export const showInput = z.object({
 
 export type ShowInput = z.infer<typeof showInput>;
 
+// 판매 중으로 저장하기 전에 꼭 채울 것(계좌 등)이 비었으면 막는다. 처음 관리자를 맡은 사람이 빈 계좌로 판매를 여는 일을 막으려고.
+function assertSellable(input: ShowInput, alreadyOnSale: boolean) {
+  if (input.status !== ShowStatus.ON_SALE) return;
+  const blockers = saleBlockers({ ...input, sessionDate: input.session.date, totalCapacity: input.session.totalCapacity }, { alreadyOnSale });
+  if (blockers.length > 0) {
+    throw new HttpError(400, `판매 중으로 바꾸려면 먼저 확인해 주세요: ${blockers.map((b) => `${b.label}(${b.hint})`).join(" ")}`);
+  }
+}
+
 // 공연 관리 목록: 최근 공연부터, 회차 날짜와 좌석을 잡은 예매 수를 함께.
 // 예매 수는 공연마다 따로 묻지 않고 한 번에 센다(DB 왕복 횟수가 곧 속도라서).
 export async function listShows() {
@@ -122,11 +133,7 @@ export async function loadShow(id: string) {
 
 // 공연을 만들거나 고치는 트랜잭션을 한 줄로 세운다. 두 관리자가 동시에 서로 다른 공연을 '판매 중'으로 저장해도
 // 앞 사람이 끝난 뒤에 뒷사람이 다른 판매 중 공연을 정리하므로 판매 중이 둘이 되지 않는다.
-const SHOW_WRITE_LOCK = 20270221;
-async function lockShowWrites(tx: Prisma.TransactionClient) {
-  // pg_advisory_xact_lock은 void를 돌려줘서 Prisma가 읽지 못한다. 글자로 바꿔 받는다.
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(${SHOW_WRITE_LOCK})::text AS locked`;
-}
+const lockShowWrites = (tx: Prisma.TransactionClient) => advisoryLock(tx, LOCK_KEYS.showWrites);
 
 // 판매 중은 한 번에 하나: 다른 판매 중 공연은 지난 공연으로 옮긴다.
 async function endOtherOnSale(tx: Prisma.TransactionClient, keepId: string | null) {
@@ -137,6 +144,7 @@ async function endOtherOnSale(tx: Prisma.TransactionClient, keepId: string | nul
 }
 
 export async function createShow(input: ShowInput, actorUserId: string) {
+  assertSellable(input, false);
   const { session, ...fields } = input;
   return prisma.$transaction(async (tx) => {
     await lockShowWrites(tx);
@@ -155,6 +163,7 @@ export async function createShow(input: ShowInput, actorUserId: string) {
 export async function updateShow(id: string, input: ShowInput, actorUserId: string) {
   const current = await loadShow(id);
   if (!current) throw new HttpError(404, "공연을 찾을 수 없어요.");
+  assertSellable(input, current.status === ShowStatus.ON_SALE);
   const { session: sessionInput, ...fields } = input;
   const sessionData = {
     title: sessionInput.title,

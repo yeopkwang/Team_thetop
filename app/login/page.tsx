@@ -6,7 +6,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { KakaoIcon } from "@/components/icons";
 import Wordmark from "@/components/Wordmark";
 import { loginErrorMessage } from "@/lib/login-errors";
+import { staffLevel } from "@/lib/roles";
 import { sameOriginPath } from "@/lib/safe-next";
+import { SITE } from "@/lib/site";
 import { apiFetch, clearAuthState, errorMessage, getAuthProvider, setAuthProvider, setToken } from "@/lib/api-client";
 
 type User = { id: string; name?: string | null; email?: string | null; roles?: string[] };
@@ -122,14 +124,14 @@ function LoginPageContent() {
     setMessage("로그아웃했어요.");
   };
 
-  const isAdmin = !!user?.roles?.some((r) => r === "ADMIN" || r === "SUPER_ADMIN");
+  const isStaff = staffLevel(user?.roles || []) !== null;
 
   return (
     <main className="page pb-16">
       <div className="mx-auto max-w-[400px] pt-12 lg:pt-20">
         <div className="text-center">
           <Wordmark className="text-[34px] text-ink" />
-          <p className="mt-2 text-ui text-ink-3">밴드 반송 공연 예매</p>
+          <p className="mt-2 text-ui text-ink-3">{SITE.band} 공연 예매</p>
         </div>
 
         {!checked ? (
@@ -138,10 +140,10 @@ function LoginPageContent() {
           <section className="mt-10">
             <div className="rounded-lg border border-line p-5 text-center">
               <p className="text-lead font-bold">{user.name || "관객"}님</p>
-              <p className="mt-1 text-ui text-ink-3">{isAdmin ? "관리자 계정으로 로그인했어요." : "카카오 계정으로 로그인했어요."}</p>
+              <p className="mt-1 text-ui text-ink-3">{isStaff ? "운영진 계정으로 로그인했어요." : "카카오 계정으로 로그인했어요."}</p>
             </div>
             <div className="mt-4 grid gap-2">
-              {isAdmin ? (
+              {isStaff ? (
                 <Link href="/admin" className="btn-primary btn-lg">
                   관리자 페이지
                 </Link>

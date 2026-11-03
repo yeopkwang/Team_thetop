@@ -5,14 +5,13 @@ import { LockIcon } from "../icons";
 type Props = {
   show: { title: string; dateLabel: string; timeLabel: string; venue: string };
   booking: { id: string; status: string; createdAt: string };
-  ticketCode: string;
   checkedInAt: string | null;
   qrImage: string;
   children?: React.ReactNode;
 };
 
 // 마이 티켓의 모바일 티켓. 진홍 머리, 절취선, QR. 입장하면 도장이 찍힌다.
-export default function TicketStub({ show, booking, ticketCode, checkedInAt, qrImage, children }: Props) {
+export default function TicketStub({ show, booking, checkedInAt, qrImage, children }: Props) {
   const status = checkedInAt ? { label: "입장 완료" } : reservationStatus(booking.status);
   const live = booking.status === "CONFIRMED" || booking.status === "PAYMENT_PENDING";
 
@@ -62,10 +61,7 @@ export default function TicketStub({ show, booking, ticketCode, checkedInAt, qrI
             <p className="mt-3 text-ui font-semibold text-ink">
               {checkedInAt ? "입장 처리된 티켓이에요" : "입장할 때 이 QR을 보여 주세요"}
             </p>
-            {/* QR이 안 찍힐 때 운영진이 손으로 입력하는 값 */}
-            {!checkedInAt && ticketCode && (
-              <p className="mt-1 max-w-[220px] break-all text-center font-mono text-[10px] leading-4 text-ink-4">{ticketCode}</p>
-            )}
+            {!checkedInAt && <p className="mt-1 text-cap text-ink-3">QR이 안 찍히면 이름이나 아래 예매번호를 알려 주세요.</p>}
           </div>
         )}
 

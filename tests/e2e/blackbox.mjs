@@ -70,6 +70,8 @@ const book = (u, extra = {}) =>
     body: { sessionId, quantity: 1, preferredPerformerName: "없음", depositorName: `입금자${++n}`, ...extra },
   });
 const dash = async (u) => (await api("/my/ticket-dashboard", { token: u.token })).data;
+// 환불 요청 본문: 환불받을 계좌까지
+const refundBody = (reservationId) => ({ reservationId, bank: "시험은행", account: "110-123-456789", holder: "홍길동" });
 
 // ======================================================================
 section("A. 인증·권한 (동등 분할: 토큰 없음 · 깨진 토큰 · 위조 · 만료 · 관객 · 운영진)");
@@ -296,13 +298,13 @@ check("입금 대기 → 운영진 취소, 관객에게 사유가 보인다", st
 // 완료 예매는 취소 불가
 check("예매 완료 → 관객 취소 불가(400)", (await api(`/bookings/${bookingOf(fa)}/cancel`, { token: fa.token, method: "POST" })).status === 400);
 check("예매 완료 → 운영진 취소 불가(400, 환불로 처리)", (await api(`/admin/bookings/${bookingOf(fa)}/cancel`, { token: admin, method: "POST", body: { reason: "x" } })).status === 400);
-check("입금 대기 → 환불 요청 불가(400)", (await api("/refunds/request", { token: fd.token, method: "POST", body: { reservationId: bookingOf(fd) } })).status === 400);
+check("입금 대기 → 환불 요청 불가(400)", (await api("/refunds/request", { token: fd.token, method: "POST", body: refundBody(bookingOf(fd)) })).status === 400);
 // 예매 완료 → 환불 요청 → 되돌리기 → 다시 요청 → 환불 완료
 const faDash = await dash(fa);
 check("예매 완료면 마이 티켓에 QR 코드", faDash.booking.status === "CONFIRMED" && !!faDash.ticket?.code);
-check("남의 예매 환불 요청 → 403", (await api("/refunds/request", { token: fd.token, method: "POST", body: { reservationId: bookingOf(fa) } })).status === 403);
+check("남의 예매 환불 요청 → 403", (await api("/refunds/request", { token: fd.token, method: "POST", body: refundBody(bookingOf(fa)) })).status === 403);
 const seatsBeforeRefund = await seatsLeft();
-const reqRefund = await api("/refunds/request", { token: fa.token, method: "POST", body: { reservationId: bookingOf(fa) } });
+const reqRefund = await api("/refunds/request", { token: fa.token, method: "POST", body: refundBody(bookingOf(fa)) });
 check("예매 완료 → 환불 요청, 좌석이 풀린다", reqRefund.status === 200 && (await seatsLeft()) === seatsBeforeRefund + 1, reqRefund.data?.error);
 const refundScan = await api("/admin/checkin", { token: admin, method: "POST", body: { qrToken: faDash.ticket.code } });
 check("환불 요청한 티켓으로 입장 → 거부", refundScan.status === 400 && refundScan.data.error.includes("환불을 요청한"), refundScan.data?.error);
@@ -310,7 +312,7 @@ const refundId = (await api("/admin/refunds", { token: admin })).data.refunds.fi
 const revert = await api(`/admin/refunds/${refundId}/revert`, { token: admin, method: "POST" });
 check("환불 요청 되돌리기 → 예매 완료, 좌석을 다시 잡는다", revert.status === 200 && (await dash(fa)).booking.status === "CONFIRMED" && (await seatsLeft()) === seatsBeforeRefund, revert.data?.error);
 check("되돌린 요청을 또 되돌리기 → 404(요청이 없다)", (await api(`/admin/refunds/${refundId}/revert`, { token: admin, method: "POST" })).status === 404);
-await api("/refunds/request", { token: fa.token, method: "POST", body: { reservationId: bookingOf(fa) } });
+await api("/refunds/request", { token: fa.token, method: "POST", body: refundBody(bookingOf(fa)) });
 const refundId2 = (await api("/admin/refunds", { token: admin })).data.refunds.find((r) => r.bookingId === bookingOf(fa)).id;
 const done = await Promise.all([1, 2].map(() => api(`/admin/refunds/${refundId2}/refund`, { token: admin, method: "POST" })));
 check("두 운영진이 동시에 환불 완료 → 하나만 처리(200, 409)", statuses(done) === "200,409", statuses(done));
@@ -336,7 +338,7 @@ await api(`/admin/bookings/${fbDash.booking.id}/confirm`, { token: admin, method
 const qr = (await dash(fb)).ticket.code;
 const refundRace = await Promise.all([
   api("/admin/checkin", { token: admin, method: "POST", body: { qrToken: qr } }),
-  api("/refunds/request", { token: fb.token, method: "POST", body: { reservationId: fbDash.booking.id } }),
+  api("/refunds/request", { token: fb.token, method: "POST", body: refundBody(fbDash.booking.id) }),
 ]);
 const fbAfter = (await dash(fb)).booking.status;
 check(
@@ -352,7 +354,7 @@ const scans = await Promise.all([1, 2].map(() => api("/admin/checkin", { token: 
 check("같은 QR을 두 기기에서 동시에 찍음 → 200 하나, 409 하나", statuses(scans) === "200,409", statuses(scans));
 const scanned = scans.find((s) => s.status === 200).data;
 check("입장 결과에 입금자명(실명)과 공연명", scanned.name === "입장확인" && scanned.showTitle === "시험 공연 5");
-check("입장한 티켓은 환불 요청 불가", (await api("/refunds/request", { token: g1.token, method: "POST", body: { reservationId: (await dash(g1)).booking.id } })).status === 400);
+check("입장한 티켓은 환불 요청 불가", (await api("/refunds/request", { token: g1.token, method: "POST", body: refundBody((await dash(g1)).booking.id) })).status === 400);
 check("없는 QR → 404 · 빈 QR → 400", (await api("/admin/checkin", { token: admin, method: "POST", body: { qrToken: "nope" } })).status === 404 && (await api("/admin/checkin", { token: admin, method: "POST", body: { qrToken: " " } })).status === 400);
 // 지난 공연 티켓
 const [old] = await makeUsers(1, "lastyear");
@@ -424,6 +426,238 @@ check("4MB 넘는 이미지 → 400", (await upload(admin, fileForm(new Blob([ne
 check("파일 없이 JSON으로 보내면 400(500이 아니라)", (await api("/admin/assets", { token: admin, method: "POST", body: { file: "x" } })).status === 400);
 check("관객은 올릴 수 없다(403)", (await upload(audience.token, fileForm(new Blob([png], { type: "image/png" }), "p.png"))).status === 403);
 check("없는 이미지 → 404", (await fetch(BASE + "/api/assets/nope")).status === 404);
+
+// ======================================================================
+section("N. 관객 편의 (입금자명 고치기 · 환불 계좌 · 캘린더 · 자주 묻는 질문)");
+const [n1, n2] = await makeUsers(2, "conv");
+const nb = (await book(n1, { depositorName: "김민지" })).data.booking;
+const rename = (u, id, depositorName) => api(`/bookings/${id}/depositor`, { token: u.token, method: "POST", body: { depositorName } });
+const renamed = await rename(n1, nb.id, "  김   민 지 ");
+check(
+  "입금 대기 중 입금자명 고치기 → 마이 티켓과 입금 확인 목록에 같이 바뀐다",
+  renamed.status === 200 &&
+    (await dash(n1)).booking.depositorName === "김 민 지" &&
+    (await api("/admin/bookings/pending", { token: admin })).data.bookings.some((b) => b.id === nb.id && b.depositorName === "김 민 지"),
+  renamed.data?.error
+);
+check("남의 예매 입금자명 → 403", (await rename(n2, nb.id, "가로채기")).status === 403);
+check("입금자명 빈칸·21자 → 400", (await rename(n1, nb.id, "  ")).status === 400 && (await rename(n1, nb.id, "가".repeat(21))).status === 400);
+check("없는 예매 → 404", (await rename(n1, "no-such-booking", "김민지")).status === 404);
+await api(`/admin/bookings/${nb.id}/confirm`, { token: admin, method: "POST" });
+check("입금 확인된 뒤에는 입금자명을 고칠 수 없다(400)", (await rename(n1, nb.id, "다른이름")).status === 400);
+
+const noAccount = await api("/refunds/request", { token: n1.token, method: "POST", body: { reservationId: nb.id } });
+check("환불 계좌 없이 요청 → 400, 무엇이 빠졌는지 안내", noAccount.status === 400 && noAccount.data.error.includes("은행"), noAccount.data?.error);
+check(
+  "계좌번호에 글자가 섞이면 400, 실패한 요청은 좌석을 풀지 않는다",
+  (await api("/refunds/request", { token: n1.token, method: "POST", body: { ...refundBody(nb.id), account: "110-abc-4567" } })).status === 400 &&
+    (await dash(n1)).booking.status === "CONFIRMED"
+);
+const reqN = await api("/refunds/request", { token: n1.token, method: "POST", body: { ...refundBody(nb.id), account: "110 123 456789" } });
+const nDash = await dash(n1);
+check("환불 요청: 관객 화면에는 계좌 끝 네 자리만", reqN.status === 200 && nDash.refund?.account === "****6789" && nDash.refund?.bank === "시험은행", JSON.stringify(nDash.refund));
+const nRefund = (await api("/admin/refunds", { token: admin })).data.refunds.find((r) => r.bookingId === nb.id);
+check("관리자 환불 목록에는 송금할 계좌 전체", nRefund?.account === "110123456789" && nRefund?.holder === "홍길동" && nRefund?.bank === "시험은행");
+await api(`/admin/refunds/${nRefund.id}/refund`, { token: admin, method: "POST" });
+const nRefundDone = (await api("/admin/refunds", { token: admin })).data.refunds.find((r) => r.id === nRefund.id);
+const dbAccount = (await prisma.refund.findUnique({ where: { id: nRefund.id } })).refundAccount;
+check("환불 완료하면 계좌번호는 DB에서도 끝 네 자리만 남는다", nRefundDone.account === "****6789" && dbAccount === "****6789", dbAccount);
+
+const icsRes = await fetch(BASE + "/api/calendar?type=show");
+const icsText = await icsRes.text();
+check(
+  "캘린더 파일: 공연 일정(.ics, 한국 18시 = UTC 09시)",
+  icsRes.status === 200 &&
+    (icsRes.headers.get("content-type") || "").startsWith("text/calendar") &&
+    icsText.includes("SUMMARY:시험 공연 5") &&
+    icsText.includes("DTSTART:20270221T090000Z")
+);
+check("티켓 오픈 일시가 없으면 오픈 알림 파일은 404", (await fetch(BASE + "/api/calendar?type=open")).status === 404);
+await putShow({ salesOpenAt: "2027-01-10T03:00:00.000Z" });
+const openIcs = await (await fetch(BASE + "/api/calendar?type=open")).text();
+const showHtml = (await page("/show")).html;
+check("오픈 전이면 오픈 알림 파일(10분 전 알림)과 공연 안내의 '티켓 오픈 알림 받기'", openIcs.includes("SUMMARY:시험 공연 5 티켓 오픈") && openIcs.includes("TRIGGER:-PT10M") && showHtml.includes("티켓 오픈 알림 받기"));
+await putShow({ salesOpenAt: null });
+check("오픈 시각이 지나면 공연 안내에 오픈 알림 버튼이 없다", !(await page("/show")).html.includes("티켓 오픈 알림 받기"));
+
+const help = await page("/help");
+check("자주 묻는 질문: 공연 설정의 입금 기한·환불 문의처가 답에 들어간다", help.status === 200 && help.html.includes("24시간 안에") && help.html.includes("010-0000-0000"));
+
+// ======================================================================
+section("O. 관리자 현황 · 입장 명단 · 엑셀 명단 · 판매 전 점검 · 작업 기록");
+const summary = (await api("/admin/summary", { token: admin })).data.summary;
+const byStatus = await prisma.reservation.groupBy({ by: ["status"], where: { session: { showId } }, _count: true });
+const cnt = (s) => byStatus.find((g) => g.status === s)?._count || 0;
+const cap = (await prisma.showSession.findFirstOrThrow({ where: { showId } })).totalCapacity;
+const entered = await prisma.checkIn.count({ where: { ticket: { reservation: { session: { showId } } } } });
+check(
+  "판매 현황 숫자가 DB와 맞다(완료·대기·환불 대기·입장·남은 좌석·받은 금액)",
+  summary.show.title === "시험 공연 5" &&
+    summary.confirmed === cnt("CONFIRMED") &&
+    summary.pending === cnt("PAYMENT_PENDING") &&
+    summary.refundPending === cnt("REFUND_PENDING") &&
+    summary.checkedIn === entered &&
+    summary.remaining === cap - cnt("CONFIRMED") - cnt("PAYMENT_PENDING") &&
+    summary.received === 7000 * (cnt("CONFIRMED") + cnt("REFUND_PENDING")),
+  JSON.stringify(summary)
+);
+check("관객은 판매 현황을 못 본다(403)", (await api("/admin/summary", { token: audience.token })).status === 403);
+
+const [o1, o2] = await makeUsers(2, "door");
+const ob = (await book(o1, { depositorName: "현장입장" })).data.booking;
+const pendingOnly = (await book(o2, { depositorName: "아직입금전" })).data.booking;
+const ticketsBefore = (await api("/admin/checkin", { token: admin })).data.tickets;
+check("입장 명단에는 입금 확인된 관객만(입금 대기는 없다)", !ticketsBefore.some((t) => t.bookingId === ob.id || t.bookingId === pendingOnly.id));
+await api(`/admin/bookings/${ob.id}/confirm`, { token: admin, method: "POST" });
+const ticketsAfter = (await api("/admin/checkin", { token: admin })).data.tickets;
+const names = ticketsAfter.map((t) => t.name);
+check(
+  "입금을 확인하면 명단에 들어오고, 명단은 이름 가나다순",
+  ticketsAfter.some((t) => t.bookingId === ob.id && t.name === "현장입장" && !t.checkedInAt) && names.join() === [...names].sort((a, b) => a.localeCompare(b, "ko")).join()
+);
+const byName = await Promise.all([1, 2].map(() => api("/admin/checkin", { token: admin, method: "POST", body: { bookingId: ob.id } })));
+check("이름으로 찾아 입장 처리: 두 기기에서 동시에 눌러도 한 번(200, 409)", statuses(byName) === "200,409", statuses(byName));
+check("명단에 입장 시각이 찍힌다", !!(await api("/admin/checkin", { token: admin })).data.tickets.find((t) => t.bookingId === ob.id)?.checkedInAt);
+const notPaid = await api("/admin/checkin", { token: admin, method: "POST", body: { bookingId: pendingOnly.id } });
+check("입금 대기 예매를 이름으로 입장 → 404(티켓이 없다)", notPaid.status === 404 && notPaid.data.error.includes("입금"), notPaid.data?.error);
+check("QR도 예매도 없이 → 400 · 없는 예매 → 404", (await api("/admin/checkin", { token: admin, method: "POST", body: {} })).status === 400 && (await api("/admin/checkin", { token: admin, method: "POST", body: { bookingId: "nope" } })).status === 404);
+
+const [o3] = await makeUsers(1, "formula");
+await book(o3, { depositorName: "=1+2" });
+const csvRes = await fetch(BASE + "/api/admin/attendees?format=csv", { headers: { Authorization: `Bearer ${admin}` } });
+const csvBytes = Buffer.from(await csvRes.arrayBuffer());
+const csvText = csvBytes.toString("utf8");
+const csvLines = csvText.split("\r\n").filter(Boolean);
+const showBookings = await prisma.reservation.count({ where: { session: { showId } } });
+check(
+  "명단 엑셀: CSV, BOM(한글 안 깨짐), 한글 파일 이름",
+  csvRes.status === 200 &&
+    (csvRes.headers.get("content-type") || "").startsWith("text/csv") &&
+    csvBytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf])) &&
+    /filename\*=UTF-8''/.test(csvRes.headers.get("content-disposition") || "")
+);
+check("명단 엑셀: 머리 줄 + 이 공연의 예매 수만큼", csvLines[0] === "﻿예매번호,상태,입금자명,카카오 이름,관심 공연자,예매 일시,입장 일시,취소 사유" && csvLines.length === showBookings + 1, `${csvLines.length} / ${showBookings + 1}`);
+check("입금자명에 수식을 넣어도 엑셀에서 실행되지 않는다('=1+2)", csvText.includes(",'=1+2,") && !csvText.includes(",=1+2,"));
+check(
+  "명단: 로그인 없이 401 · 관객 403",
+  (await fetch(BASE + "/api/admin/attendees?format=csv")).status === 401 && (await api("/admin/attendees", { token: audience.token })).status === 403
+);
+const lastYear = await api("/admin/attendees?show=operation-moon-4", { token: admin });
+check("지난 공연을 골라 명단을 받을 수 있다", lastYear.status === 200 && lastYear.data.show.title === "작전명문 4" && lastYear.data.people.some((p) => p.name === "작년관객"));
+check("없는 공연 명단 → 404", (await api("/admin/attendees?show=nope", { token: admin })).status === 404);
+
+const noAcct = await putShow({ paymentAccount: " " });
+check("관람료가 있는데 계좌가 비면 판매 중으로 저장할 수 없다(400, 이유 안내)", noAcct.status === 400 && noAcct.data.error.includes("입금 계좌"), noAcct.data?.error);
+check("무료 공연(0원)은 계좌 없이 판매 중 저장 가능", (await putShow({ price: 0, paymentAccount: "" })).status === 200);
+await putShow();
+const draftId = (await api("/admin/shows", { token: admin, method: "POST", body: { ...showBody, title: "날짜 지난 공연", status: "DRAFT", session: { ...showBody.session, date: "2026-01-01T09:00:00.000Z" } } })).data.id;
+const pastOnSale = await api(`/admin/shows/${draftId}`, { token: admin, method: "PUT", body: { ...showBody, title: "날짜 지난 공연", session: { ...showBody.session, date: "2026-01-01T09:00:00.000Z" } } });
+check("공연 일시가 지난 공연은 판매 중으로 바꿀 수 없다(400)", pastOnSale.status === 400 && pastOnSale.data.error.includes("공연 일시"), pastOnSale.data?.error);
+check("새 공연을 처음부터 판매 중으로 만들 때도 같은 검사", (await api("/admin/shows", { token: admin, method: "POST", body: { ...showBody, paymentHolder: "" } })).status === 400);
+await api(`/admin/shows/${draftId}`, { token: admin, method: "DELETE" });
+check("검사에 막혀도 원래 판매 중 공연은 그대로", (await api("/admin/shows", { token: admin })).data.shows.filter((s) => s.status === "ON_SALE").map((s) => s.id).join() === showId);
+
+const bookingLogs = (await api("/admin/logs?kind=booking", { token: admin })).data;
+check("작업 기록: 최근 것부터", bookingLogs.logs.every((l, i, all) => i === 0 || new Date(all[i - 1].at) >= new Date(l.at)));
+check(
+  "작업 기록: 입장 확인은 누가·누구를·어떤 방법으로",
+  bookingLogs.logs.some((l) => l.action === "입장 확인" && l.target.includes("현장입장") && l.detail.includes("이름·예매번호") && l.actor.includes("(admin)"))
+);
+check("작업 기록: 입금자명 수정은 바뀌기 전과 뒤", bookingLogs.logs.some((l) => l.action === "관객이 입금자명 수정" && l.detail === "김민지 → 김 민 지" && l.actor === "conv0"));
+check("작업 기록: 환불 완료에는 계좌 끝 네 자리만", bookingLogs.logs.some((l) => l.action === "환불 완료" && l.detail.includes("****6789")) && !JSON.stringify(bookingLogs).includes("110123456789"));
+const allLogs = (await api("/admin/logs", { token: admin })).data;
+const page2 = await api(`/admin/logs?cursor=${allLogs.nextCursor}`, { token: admin });
+check(
+  "작업 기록 50개씩: 다음 페이지는 겹치지 않고 이어진다",
+  allLogs.logs.length === 50 && !!allLogs.nextCursor && page2.status === 200 && !page2.data.logs.some((l) => allLogs.logs.some((x) => x.id === l.id)) && new Date(page2.data.logs[0].at) <= new Date(allLogs.logs[49].at)
+);
+
+// ======================================================================
+section("P. 운영진 계정 (만들기 · 스태프 권한 · 비밀번호 · 로그인 잠금 · 지우기)");
+const makeAccount = (body, t = admin) => api("/admin/accounts", { token: t, method: "POST", body: { name: "입구 스태프", password: "staff-pass-1234", role: "STAFF", ...body } });
+check("스태프 계정 만들기(아이디는 소문자로 저장)", (await makeAccount({ username: "Door.Staff" })).status === 200);
+check("같은 아이디 → 409", (await makeAccount({ username: "door.staff" })).status === 409);
+check("임시 비밀번호 9자 → 400 · 관리자 아닌 권한 → 400", (await makeAccount({ username: "short", password: "123456789" })).status === 400 && (await makeAccount({ username: "super", role: "SUPER_ADMIN" })).status === 400);
+const staffLogin = await api("/auth/login", { method: "POST", body: { id: "door.staff", password: "staff-pass-1234" } });
+check("스태프 로그인 → 토큰, 역할 STAFF", staffLogin.status === 200 && staffLogin.data.user.roles.join() === "STAFF", staffLogin.data?.error);
+const staff = staffLogin.data.token;
+for (const [label, path, expected] of [
+  ["입금 확인 목록", "/admin/bookings/pending", 200],
+  ["입장 명단", "/admin/checkin", 200],
+  ["예매자 목록", "/admin/reservations", 200],
+  ["판매 현황", "/admin/summary", 200],
+  ["예매자 명단", "/admin/attendees", 200],
+  ["공연 관리", "/admin/shows", 403],
+  ["환불 관리", "/admin/refunds", 403],
+  ["작업 기록", "/admin/logs", 403],
+  ["계정 목록", "/admin/accounts", 403],
+]) {
+  check(`스태프 권한: ${label} → ${expected}`, (await api(path, { token: staff })).status === expected);
+}
+check("스태프는 계정을 만들 수 없다(403)", (await makeAccount({ username: "by-staff" }, staff)).status === 403);
+check("스태프도 이름으로 입장 처리 API를 쓸 수 있다(이미 입장한 티켓이라 409, 권한 오류가 아니다)", (await api("/admin/checkin", { token: staff, method: "POST", body: { bookingId: ob.id } })).status === 409);
+
+const changePw = (t, current, next) => api("/auth/password", { token: t, method: "POST", body: { current, next } });
+check("내 비밀번호 바꾸기: 지금 비밀번호가 틀리면 400", (await changePw(staff, "wrong-password", "staff-new-pass-5678")).status === 400);
+check("내 비밀번호 바꾸기: 같은 비밀번호로는 400", (await changePw(staff, "staff-pass-1234", "staff-pass-1234")).status === 400);
+check("관객은 비밀번호를 바꿀 곳이 없다(403)", (await changePw(audience.token, "x", "0123456789")).status === 403);
+const changed = await changePw(staff, "staff-pass-1234", "staff-new-pass-5678");
+const loginAs = (id, password) => api("/auth/login", { method: "POST", body: { id, password } });
+check(
+  "비밀번호를 바꾸면 새 비밀번호로만 로그인",
+  changed.status === 200 && (await loginAs("door.staff", "staff-pass-1234")).status === 401 && (await loginAs("door.staff", "staff-new-pass-5678")).status === 200
+);
+
+const accounts = (await api("/admin/accounts", { token: admin })).data.accounts;
+const staffAccount = accounts.find((a) => a.username === "door.staff");
+check(
+  "계정 목록: 아이디·이름·권한, 내 계정 표시, 비밀번호는 내려주지 않는다",
+  staffAccount?.role === "STAFF" && staffAccount?.name === "입구 스태프" && accounts.find((a) => a.isMe)?.username === "admin" && !JSON.stringify(accounts).includes("passwordHash") && !accounts.some((a) => a.username === "audience-pw" && a.role)
+);
+const reset = await api(`/admin/accounts/${staffAccount.id}/password`, { token: admin, method: "POST", body: { password: "reset-pass-0000" } });
+check("관리자가 비밀번호를 새로 정해 주면 그걸로 로그인", reset.status === 200 && (await loginAs("door.staff", "reset-pass-0000")).status === 200);
+
+// 앞에서 틀린 횟수(바꾸기 전 비밀번호로 시도한 1번)까지 합쳐 15분 안에 10번이면 막힌다.
+const priorFails = await prisma.auditLog.count({ where: { action: "LOGIN_FAILED", entityId: "door.staff" } });
+const fails = [];
+for (let i = priorFails; i < 10; i++) fails.push((await loginAs("door.staff", `wrong-${i}`)).status);
+const locked = await loginAs("door.staff", "reset-pass-0000");
+check("같은 아이디로 10번 틀리면 맞는 비밀번호도 막힌다(429, 기다릴 시간 안내)", fails.every((s) => s === 401) && locked.status === 429 && locked.data.error.includes("15분"), `${fails.join()} → ${locked.status}`);
+check("다른 아이디 로그인은 영향 없다", (await loginAs("admin", process.env.SEED_ADMIN_PASSWORD)).status === 200);
+
+check("내 계정은 지울 수 없다(400)", (await api(`/admin/accounts/${adminUserId}`, { token: admin, method: "DELETE" })).status === 400);
+check("없는 계정 → 404", (await api("/admin/accounts/nope", { token: admin, method: "DELETE" })).status === 404);
+const deleted = await api(`/admin/accounts/${staffAccount.id}`, { token: admin, method: "DELETE" });
+check(
+  "지운 계정은 남은 토큰도 바로 막히고(403) 로그인도 안 된다",
+  deleted.status === 200 && (await api("/admin/bookings/pending", { token: staff })).status === 403 && (await prisma.credential.count({ where: { username: "door.staff" } })) === 0
+);
+check("지운 아이디로 다시 만들 수 있다", (await makeAccount({ username: "door.staff", password: "again-pass-1234" })).status === 200);
+
+// 마지막 관리자 지키기: 관리자 둘만 남은 상태에서 서로를 동시에 지워도 한 명은 남는다.
+await makeAccount({ username: "admin-two", role: "ADMIN", password: "admin-two-pass" });
+await makeAccount({ username: "admin-three", role: "ADMIN", password: "admin-three-pass" });
+const [two, three] = [(await loginAs("admin-two", "admin-two-pass")).data, (await loginAs("admin-three", "admin-three-pass")).data];
+const mainRole = await prisma.userRole.findFirstOrThrow({ where: { userId: adminUserId, role: { type: "ADMIN" } } });
+await prisma.userRole.update({ where: { id: mainRole.id }, data: { expiresAt: PAST() } }); // 잠깐 원래 관리자를 빼 둔다
+const mutual = await Promise.all([
+  api(`/admin/accounts/${three.user.id}`, { token: two.token, method: "DELETE" }),
+  api(`/admin/accounts/${two.user.id}`, { token: three.token, method: "DELETE" }),
+]);
+const adminsLeft = await prisma.credential.count({ where: { username: { in: ["admin-two", "admin-three"] } } });
+await prisma.userRole.update({ where: { id: mainRole.id }, data: { expiresAt: null } });
+// 늦게 온 쪽은 이미 지워져 권한 확인에서 403이 나거나, 잠금 뒤 '마지막 관리자'로 400이 난다. 어느 쪽이든 한 명은 남아야 한다.
+check("관리자 둘이 서로를 동시에 지우면 하나만 성공, 마지막 관리자는 남는다", mutual.filter((r) => r.status === 200).length === 1 && ["400", "403"].includes(String(mutual.find((r) => r.status !== 200)?.status)) && adminsLeft === 1, statuses(mutual));
+const survivor = (await api("/admin/accounts", { token: admin })).data.accounts.find((a) => ["admin-two", "admin-three"].includes(a.username));
+await api(`/admin/accounts/${survivor.id}`, { token: admin, method: "DELETE" });
+
+const accountLogs = (await api("/admin/logs?kind=account", { token: admin })).data.logs;
+check(
+  "작업 기록(계정): 만들기·비밀번호·지우기·로그인 실패가 남고, 다른 종류는 섞이지 않는다",
+  ["운영진 계정 만듦", "비밀번호를 새로 정해 줌", "내 비밀번호 바꿈", "운영진 계정 지움", "로그인 실패"].every((a) => accountLogs.some((l) => l.action === a)) &&
+    accountLogs.every((l) => !["입금 확인", "공연 수정"].includes(l.action))
+);
+check("로그인 실패 기록에는 적은 아이디가 남는다(비밀번호는 남지 않는다)", accountLogs.some((l) => l.action === "로그인 실패" && l.target === "door.staff") && !JSON.stringify(accountLogs).includes("wrong-3"));
 
 // ======================================================================
 section("L. 화면 (블랙박스: 사용자가 받는 HTML)");

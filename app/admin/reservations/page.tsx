@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import StatusBadge from "@/components/StatusBadge";
-import { apiFetch, errorMessage, readAdminCache, writeAdminCache } from "@/lib/api-client";
+import { apiDownload, apiFetch, errorMessage, readAdminCache, writeAdminCache } from "@/lib/api-client";
 import { bookingNumber, formatDateTime } from "@/lib/format";
 import { reservationStatus } from "@/lib/status";
 
@@ -119,6 +120,15 @@ export default function AdminReservationsPage() {
       </span>
     ) : null;
 
+  const download = async () => {
+    setMessage("");
+    try {
+      await apiDownload("/admin/attendees?format=csv", "예매자 명단.csv");
+    } catch (error: unknown) {
+      setMessage(errorMessage(error, "명단을 내려받지 못했어요."));
+    }
+  };
+
   const counts = useMemo(
     () =>
       Object.fromEntries(
@@ -142,6 +152,14 @@ export default function AdminReservationsPage() {
 
   return (
     <section>
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => void download()} className="btn-secondary btn-sm">
+          판매 중 공연 명단 엑셀로 받기
+        </button>
+        <Link href="/admin/reservations/print" className="btn-secondary btn-sm">
+          현장용 명단 인쇄
+        </Link>
+      </div>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 md:mx-0 md:px-0" role="group" aria-label="상태로 거르기">
           {FILTERS.map((f) => {

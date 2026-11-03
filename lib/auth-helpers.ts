@@ -11,8 +11,6 @@ export function activeRoles(): Prisma.UserRoleWhereInput {
   return { isActive: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] };
 }
 
-export const isAdminRole = (roles: RoleType[]) => roles.includes(RoleType.ADMIN) || roles.includes(RoleType.SUPER_ADMIN);
-
 function userIdFromAuthHeader() {
   const authHeader = headers().get("authorization") || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";

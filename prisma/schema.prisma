@@ -183,11 +183,16 @@ model Refund {
   id            String       @id @default(cuid())
   reservationId String       @unique
   status        RefundStatus @default(PENDING)
+  // 관객이 환불을 요청할 때 적은 계좌. 송금을 마치면(환불 완료) 계좌번호는 끝 네 자리만 남긴다.
+  refundBank    String       @default("")
+  refundAccount String       @default("")
+  refundHolder  String       @default("")
   createdAt     DateTime     @default(now())
 
   reservation Reservation @relation(fields: [reservationId], references: [id])
 }
 
+// 누가 언제 무엇을 했는지. 관리자 > 작업 기록에서 본다. 예매에 관한 기록은 entityType "Reservation", entityId = 예매 id로 남긴다.
 model AuditLog {
   id          String   @id @default(cuid())
   action      String
@@ -199,6 +204,10 @@ model AuditLog {
   createdAt   DateTime @default(now())
 
   actorUser User? @relation("AuditUser", fields: [actorUserId], references: [id])
+
+  @@index([createdAt])
+  // 로그인 실패 횟수 세기(action = LOGIN_FAILED, entityId = 아이디)
+  @@index([action, entityId, createdAt])
 }
 
 model Credential {

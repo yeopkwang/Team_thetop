@@ -8,9 +8,11 @@ import MobileBookingBar from "@/components/show/MobileBookingBar";
 import { MobilePosterHero } from "@/components/show/Poster";
 import SalesInfoTable from "@/components/show/SalesInfoTable";
 import SetlistView from "@/components/show/SetlistView";
+import ShowActions from "@/components/show/ShowActions";
 import ShowSummary from "@/components/show/ShowSummary";
 import ShowTabs from "@/components/show/ShowTabs";
 import VenueInfo from "@/components/show/VenueInfo";
+import { configuredAppUrl } from "@/lib/app-url";
 import { formatDate, formatTime, kstDayKey } from "@/lib/format";
 import { normalizeSetlist } from "@/lib/setlist";
 import { getCurrentShow, getSessionAvailability } from "@/lib/show";
@@ -81,6 +83,11 @@ export default async function ShowPage() {
       <div className="page lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-10 lg:pt-10">
         <div className="min-w-0">
           <ShowSummary show={show} period={period} />
+          <ShowActions
+            show={{ id: show.id, title: show.title, salesOpenAt: show.salesOpenAt?.toISOString() ?? null }}
+            appUrl={configuredAppUrl()}
+            upcoming={Boolean(show.salesOpenAt && show.salesOpenAt > new Date())}
+          />
           <ShowTabs tabs={tabs} />
         </div>
 

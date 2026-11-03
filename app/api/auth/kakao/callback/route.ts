@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { RoleType } from "@prisma/client";
 import { getBaseUrl } from "@/lib/app-url";
-import { activeRoles, isAdminRole } from "@/lib/auth-helpers";
+import { activeRoles } from "@/lib/auth-helpers";
+import { staffLevel } from "@/lib/roles";
 import { createToken } from "@/lib/jwt";
 import { KAKAO_HANDOFF_COOKIE, KAKAO_STATE_COOKIE, kakaoCookie } from "@/lib/kakao-cookies";
 import type { LoginErrorCode } from "@/lib/login-errors";
@@ -49,7 +50,7 @@ async function upsertAudience(kakaoId: string, nickname: string) {
       select: { id: true, roles: { where: activeRoles(), select: { role: { select: { type: true } } } } },
     });
     const roles = user.roles.map((r) => r.role.type);
-    if (isAdminRole(roles)) throw new LoginFailure("admin_account");
+    if (staffLevel(roles)) throw new LoginFailure("admin_account");
     if (!roles.includes(RoleType.USER)) await tx.userRole.create({ data: { userId: user.id, roleId: userRole.id } });
     return user;
   });
