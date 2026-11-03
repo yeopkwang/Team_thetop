@@ -1,4 +1,5 @@
-﻿version: "3.9"
+# 로컬 개발용 Postgres. .env의 DATABASE_URL·DIRECT_URL을
+# postgresql://postgres:postgres@localhost:5432/showdb 로 두면 된다.
 services:
   db:
     image: postgres:15

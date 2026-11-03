@@ -1,63 +1,88 @@
-﻿# 공연 예약 웹 (Next.js + Prisma)
+# 작전명;문 공연 예매
 
-Next.js 14 App Router 기반 공연/티켓 예약 및 운영 대시보드. Prisma/PostgreSQL, NextAuth(Kakao), Tailwind를 사용합니다.
+밴드 반송(작전명문) 연례 공연의 온라인 예매·입금 확인·QR 검표·환불을 처리하는 웹앱입니다.
+운영 주소는 https://www.band-bansong.life 입니다.
 
-## 실행 방법
-1) `.env` 생성: `.env.example`를 복사하고 값 채우기
-2) 의존성 설치: `npm install`
-3) DB 실행: `docker compose up -d`
-4) 마이그레이션: `npx prisma migrate dev`
-5) 시드: `npm run prisma:seed` (SUPER_ADMIN Kakao ID 필요)
-6) 개발 서버: `npm run dev`
+- Next.js 14 (App Router) + Tailwind
+- Prisma + PostgreSQL (운영은 Supabase)
+- 일반 사용자는 카카오 로그인, 관리자는 ID/비밀번호 로그인. 로그인 토큰은 직접 서명하는 JWT입니다.
+- 배포는 Vercel
 
-## 주요 스크립트
-- `npm run dev` : Next.js 개발 서버
-- `npm run build` / `npm start`
-- `npm run prisma:migrate` : Prisma migrate dev
-- `npm run prisma:seed` : 시드 실행
-- `npm run prisma:studio` : Prisma Studio
+## 흐름
 
-## 환경 변수 (.env)
-- `DATABASE_URL` : Postgres 연결 문자열
-- `NEXTAUTH_SECRET` : NextAuth 암호화 키
-- `NEXTAUTH_URL` : 예) http://localhost:3000
-- `KAKAO_CLIENT_ID`, `_CLIENT_SECRET`
-- `SUPER_ADMIN_KAKAO_ID` : 시드 및 로그인 매칭용
-- `PUBLIC_PAYMENT_ACCOUNT` : 안내용 계좌 문자열
+1. 관객이 카카오로 로그인하고 예매합니다. 1인 1매, 예매하면 `PAYMENT_PENDING`(예매 대기) 상태가 됩니다.
+2. 관객이 안내된 계좌로 입금합니다.
+3. 관리자가 관리자 페이지에서 입금을 확인하고 승인하면 `CONFIRMED`가 되고 QR 티켓이 발급됩니다.
+4. 공연 당일 관리자 페이지의 카메라로 QR을 찍어 입장 처리합니다.
+5. 환불은 관객이 '내 티켓'에서 요청(`REFUND_PENDING`, 이때 좌석이 풀림)하고, 관리자가 송금 후 '환불 완료'를 누릅니다.
 
-## 데이터 모델 요약 (Prisma)
-- 사용자/역할: `User`, `Role`, `UserRole(expiresAt/isActive)`, `RoleRequest`
-- 공연/회차: `Show`, `ShowSession(totalCapacity/soldQty)`
-- 예약/결제: `Reservation(status, expiresAt, paymentReviewStatus, note, reviewedBy...)`
-- 티켓/검표: `Ticket(qrToken UNIQUE)`, `CheckIn`
-- 환불: `Refund`, `RefundAccount`(환불 완료 시 삭제)
-- 컨텐츠: `RecordPost`, `PhotoPost`, `PhotoAsset`, `TicketTemplate`
-- 감사 로그: `AuditLog(action, entityType, before/after json, actor info)
-- NextAuth: `Account`, `Session`, `VerificationToken`
+## 새 공연 준비하기
 
-## 핵심 API (요약)
-- Auth: `/api/auth/[...nextauth]` (Kakao)
-- 사용자: `GET /api/me`
-- 예매: `GET /api/book/shows`, `POST /api/book/reservations`, `POST /api/book/reservations/[id]/mark-paid`
-- 관리자/스탭: `GET /api/admin/reservations`, `POST /api/admin/reservations/[id]/confirm`, `POST /api/admin/checkin`
-- 환불: `POST /api/refunds/request`, `POST /api/refunds/[id]/account`, `POST /api/admin/refunds/[id]/refund`
-- 잡: `POST /api/admin/jobs/expire-reservations` (만료/롤 처리)
-- 권한: `GET/POST/PATCH /api/admin/roles/requests`
-- 기타: `GET/POST /api/admin/templates`, `POST /api/photo/upload`
+공연 제목, 일시, 장소, 관람료, 입금 계좌, 정원, 셋리스트·판매 안내문은 코드가 아니라 DB에 있습니다.
+관리자로 로그인한 뒤 **관리자 페이지 > 공연 정보**(`/admin/show`)에서 고치고 저장하면 바로 반영됩니다.
 
-## 시드 데이터
-- Role 4종 생성
-- SUPER_ADMIN 1명: `SUPER_ADMIN_KAKAO_ID` 기준 upsert
-- 샘플 Show/Session, 글로벌 티켓 템플릿 `/public/ticket-template.png`
+- '홈·예매 화면에 공개하고 예매를 받습니다'를 끄면 홈에 "지금 예매 중인 공연이 없습니다"가 뜨고 예매도 막힙니다.
+- 긴 안내문은 빈 줄로 칸을 나누고, 칸 첫 줄을 `# 제목`으로 쓰면 제목 붙은 상자로 보입니다.
+- 포스터는 `public/uploads/`에 파일을 넣고 `/uploads/파일명.png`로 적거나, 외부 이미지 주소를 적습니다.
+- 지난 공연 예매 기록을 지우려면 `docs/supabase-reset-sales.sql`을 Supabase SQL Editor에서 실행합니다.
 
-## 페이지 구조 (app/)
-- `(public)/page.tsx` 메인
-- `login`, `intro`, `book`, `mypage`, `myticket`
-- `record`, `record/[id]`, `photo`, `photo/upload`
-- `admin/*` 대시보드 (예약/환불/검표/템플릿/권한)
+## 로컬 실행
 
-## 주의사항
-- ADMIN 동시 2명 제한 (RoleRequest 승인 시 체크)
-- 예약 24h 자동 만료: `/api/admin/jobs/expire-reservations`
-- 환불 완료 시 티켓 REVOKED + RefundAccount 삭제
-- 모든 보호 API는 역할 가드 사용 (USER/STAFF/ADMIN/SUPER_ADMIN)
+```bash
+cp .env.example .env          # 값 채우기 (아래 표)
+npm install
+docker compose up -d          # 로컬 Postgres. Supabase를 쓰면 생략
+npm run prisma:deploy         # 마이그레이션 적용
+npm run prisma:seed           # 역할, 관리자 계정, 비공개 공연 틀 생성
+npm run dev                   # http://localhost:3000
+```
+
+## 환경변수
+
+| 이름 | 설명 |
+| --- | --- |
+| `DATABASE_URL` | 앱이 쓰는 DB 주소. Supabase는 트랜잭션 풀러(6543) + `pgbouncer=true&connection_limit=1` |
+| `DIRECT_URL` | 마이그레이션용 DB 주소. Supabase는 세션 연결(5432) |
+| `APP_URL` | 서비스 주소(끝에 `/` 없이). 카카오 Redirect URI가 `APP_URL/api/auth/kakao/callback` |
+| `JWT_SECRET` | 로그인 토큰 서명 키. 32자 이상 무작위 문자열. 없으면 로그인이 동작하지 않습니다 |
+| `KAKAO_CLIENT_ID` / `KAKAO_CLIENT_SECRET` | 카카오 REST API 키 / Client Secret |
+| `KAKAO_LOGOUT_REDIRECT_URI` | 카카오 로그아웃 뒤 돌아올 주소. 카카오 콘솔에 등록 필요 |
+| `SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD` | `npm run prisma:seed`가 만드는 관리자 계정(비밀번호 10자 이상). 시드 때만 필요 |
+
+`JWT_SECRET`을 바꾸면 기존 로그인은 모두 풀립니다.
+
+## 배포 (Vercel + Supabase)
+
+1. Supabase에서 프로젝트를 만들고 연결 문자열 두 개를 받습니다.
+2. 내 컴퓨터에서 `.env`에 그 값을 넣고 `npm run prisma:deploy`, `npm run prisma:seed`를 실행합니다.
+3. Vercel 프로젝트 환경변수에 `DATABASE_URL`, `DIRECT_URL`, `APP_URL`, `JWT_SECRET`, 카카오 값 3개를 넣습니다.
+4. 카카오 개발자 콘솔에 Redirect URI와 로그아웃 Redirect URI를 등록합니다.
+5. Vercel이 배포하는 브랜치에 푸시합니다. 빌드는 `prisma generate && next build`입니다.
+
+Supabase 무료 플랜은 오래 안 쓰면 프로젝트가 일시정지됩니다. 판매 시작 전에 대시보드에서 살아 있는지 확인하세요.
+
+## 폴더
+
+```
+app/
+  page.tsx, book/, myticket/, login/   관객 화면
+  admin/                               관리자 화면 (QR 검표·입금 확인, 예매자 목록, 환불, 공연 정보)
+  api/                                 라우트 핸들러
+components/                            화면 조각 (공연 정보 카드, 예매 폼, 관리자 메뉴 등)
+lib/
+  auth-helpers.ts, jwt.ts              로그인 확인과 역할 검사
+  show.ts                              지금 공개 중인 공연 조회
+  reservations.ts                      좌석을 차지하는 예매 상태 목록
+  api-client.ts                        브라우저에서 API를 부르는 fetch 래퍼(토큰을 붙임)
+prisma/                                스키마, 마이그레이션, 시드
+docs/                                  운영용 SQL
+```
+
+## 알아둘 점
+
+- 예매는 회차 행을 잠그고(`SELECT ... FOR UPDATE`) 처리해서, 동시에 몰려도 정원과 1인 1매를 넘지 않습니다.
+- 예매 대기 상태에는 24시간 뒤의 `expiresAt`이 기록되지만, 자동으로 만료시키는 작업은 없습니다.
+  입금을 늦게 확인한 예매가 취소되는 일을 막기 위해서입니다. 미입금 예매는 관객이 '내 티켓'에서 직접 취소해야 하고,
+  관리자 화면에는 아직 대신 취소하는 버튼이 없습니다.
+- 관리자 계정은 카카오로 로그인할 수 없고, 일반 계정은 ID/비밀번호로 로그인할 수 없습니다.
+- 승인, 검표, 환불, 공연 정보 수정은 `AuditLog` 테이블에 남습니다.
