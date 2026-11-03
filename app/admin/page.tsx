@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { springFetch } from "@/lib/spring-client";
+import { apiFetch } from "@/lib/api-client";
 
 type PendingBooking = {
   booking: {
@@ -60,7 +60,7 @@ export default function AdminPage() {
     setLoading(true);
     setMessage("");
     try {
-      const data = await springFetch<PendingBooking[]>("/admin/bookings/pending");
+      const data = await apiFetch<PendingBooking[]>("/admin/bookings/pending");
       setList(Array.isArray(data) ? data : []);
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : "예약 대기 목록을 불러오지 못했습니다.");
@@ -79,7 +79,7 @@ export default function AdminPage() {
   const confirmBooking = async (bookingId: string) => {
     setMessage("");
     try {
-      await springFetch(`/admin/bookings/${bookingId}/confirm`, {
+      await apiFetch(`/admin/bookings/${bookingId}/confirm`, {
         method: "POST",
         bodyJson: {},
       });
@@ -94,7 +94,7 @@ export default function AdminPage() {
     if (!qrToken) return;
     setMessage("");
     try {
-      const data = await springFetch<CheckInResponse>("/admin/checkin", {
+      const data = await apiFetch<CheckInResponse>("/admin/checkin", {
         method: "POST",
         bodyJson: { qrToken },
       });

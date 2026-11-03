@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { springFetch } from "@/lib/spring-client";
+import { apiFetch } from "@/lib/api-client";
 import { CURRENT_SHOW_INFO } from "@/lib/show-info";
 
 type EventItem = {
@@ -31,7 +31,7 @@ export default function BookPage() {
       setLoading(true);
       setError("");
       try {
-        const data = await springFetch<EventItem[]>("/events");
+        const data = await apiFetch<EventItem[]>("/events");
         const safe = Array.isArray(data) ? data : [];
         setEvents(safe);
         if (safe.length > 0) setSelectedSessionId(safe[0].id);
@@ -72,7 +72,7 @@ export default function BookPage() {
     setMessage("예매가 진행중입니다. 잠시만 기다려주세요.");
 
     try {
-      await springFetch<BookingResponse>("/bookings", {
+      await apiFetch<BookingResponse>("/bookings", {
         method: "POST",
         bodyJson: {
           eventId: selectedSessionId,

@@ -38,7 +38,7 @@ export function clearAuthState(): void {
   window.dispatchEvent(new Event("storage"));
 }
 
-export async function springFetch<T = unknown>(
+export async function apiFetch<T = unknown>(
   path: string,
   init?: RequestInit & { bodyJson?: JsonValue }
 ): Promise<T> {

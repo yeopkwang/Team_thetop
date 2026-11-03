@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { springFetch } from "@/lib/spring-client";
+import { apiFetch } from "@/lib/api-client";
 import { CURRENT_SHOW_INFO } from "@/lib/show-info";
 
 type BookingStatus =
@@ -44,7 +44,7 @@ export default function MyTicketPage() {
     setLoading(true);
     setError("");
     try {
-      const data = await springFetch<{ booking: Booking | null; tickets: Ticket[] }>("/my/ticket-dashboard");
+      const data = await apiFetch<{ booking: Booking | null; tickets: Ticket[] }>("/my/ticket-dashboard");
       if (!data?.booking) {
         setPayload(null);
         return;
@@ -99,7 +99,7 @@ export default function MyTicketPage() {
     if (!payload) return;
     setMessage("");
     try {
-      await springFetch(`/bookings/${payload.booking.id}/cancel`, { method: "POST" });
+      await apiFetch(`/bookings/${payload.booking.id}/cancel`, { method: "POST" });
       setMessage("예매가 취소되었고 좌석이 복구되었습니다.");
       await load();
     } catch (e: unknown) {
@@ -119,7 +119,7 @@ export default function MyTicketPage() {
 
     setMessage("");
     try {
-      await springFetch("/refunds/request", {
+      await apiFetch("/refunds/request", {
         method: "POST",
         bodyJson: { reservationId },
       });

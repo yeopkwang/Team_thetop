@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getToken, springFetch } from "@/lib/spring-client";
+import { getToken, apiFetch } from "@/lib/api-client";
 
 type MeResponse = {
   user?: {
@@ -25,7 +25,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
 
       try {
-        const me = await springFetch<MeResponse>("/auth/me");
+        const me = await apiFetch<MeResponse>("/auth/me");
         const roles = me?.user?.roles || [];
         const isAdmin = roles.includes("ADMIN") || roles.includes("SUPER_ADMIN");
         if (!isAdmin) {

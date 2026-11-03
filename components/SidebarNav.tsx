@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getToken, springFetch } from "@/lib/spring-client";
+import { getToken, apiFetch } from "@/lib/api-client";
 
 type NavItem = {
   href: string;
@@ -68,7 +68,7 @@ export default function SidebarNav() {
       }
 
       try {
-        const me = await springFetch<MeResponse>("/auth/me");
+        const me = await apiFetch<MeResponse>("/auth/me");
         const roles = me?.user?.roles || [];
         const nextIsAdmin = roles.includes("ADMIN") || roles.includes("SUPER_ADMIN");
         window.localStorage.setItem(

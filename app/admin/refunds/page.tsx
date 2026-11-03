@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { springFetch } from "@/lib/spring-client";
+import { apiFetch } from "@/lib/api-client";
 
 type RefundItem = {
   id: string;
@@ -25,7 +25,7 @@ export default function AdminRefundsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const data = await springFetch<{ refunds: RefundItem[] }>("/admin/refunds");
+      const data = await apiFetch<{ refunds: RefundItem[] }>("/admin/refunds");
       setItems(Array.isArray(data?.refunds) ? data.refunds : []);
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : "환불 요청 목록을 불러오지 못했습니다.");
@@ -41,7 +41,7 @@ export default function AdminRefundsPage() {
   const refund = async (id: string) => {
     setMessage("");
     try {
-      await springFetch(`/admin/refunds/${id}/refund`, { method: "POST", bodyJson: {} });
+      await apiFetch(`/admin/refunds/${id}/refund`, { method: "POST", bodyJson: {} });
       setMessage("환불 완료 처리되었습니다. 좌석 수량이 복구되었습니다.");
       await load();
     } catch (error: unknown) {

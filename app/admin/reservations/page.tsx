@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { springFetch } from "@/lib/spring-client";
+import { apiFetch } from "@/lib/api-client";
 
 type ReservationItem = {
   id: string;
@@ -50,7 +50,7 @@ export default function AdminReservationsPage() {
       const qs = new URLSearchParams({ limit: String(PAGE_LIMIT) });
       if (cursor) qs.set("cursor", cursor);
 
-      const data = await springFetch<ReservationListResponse>(`/admin/reservations?${qs.toString()}`);
+      const data = await apiFetch<ReservationListResponse>(`/admin/reservations?${qs.toString()}`);
       const incoming = Array.isArray(data?.reservations) ? data.reservations : [];
       const incomingCursor = data?.nextCursor || null;
 

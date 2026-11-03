@@ -7,8 +7,8 @@ import {
   getAuthProvider,
   setAuthProvider,
   setToken,
-  springFetch,
-} from "@/lib/spring-client";
+  apiFetch,
+} from "@/lib/api-client";
 
 type MeResponse = {
   user: { id: string; name?: string | null; email?: string | null; roles?: string[] };
@@ -30,7 +30,7 @@ function LoginPageContent() {
 
   const refreshMe = async () => {
     try {
-      const data = await springFetch<MeResponse>("/auth/me");
+      const data = await apiFetch<MeResponse>("/auth/me");
       setCurrentUser(data.user);
     } catch {
       setCurrentUser(null);
@@ -64,7 +64,7 @@ function LoginPageContent() {
     event.preventDefault();
     setMessage("관리자 로그인 중...");
     try {
-      const data = await springFetch<AuthResponse>("/auth/login", {
+      const data = await apiFetch<AuthResponse>("/auth/login", {
         method: "POST",
         bodyJson: { id: loginId.trim(), password: loginPassword },
       });

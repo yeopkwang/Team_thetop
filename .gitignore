@@ -29,3 +29,6 @@ Thumbs.db
 
 # Tests/Coverage
 coverage/
+
+# TypeScript incremental cache
+*.tsbuildinfo
