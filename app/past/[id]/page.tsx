@@ -7,9 +7,11 @@ import CreditsTable from "@/components/show/CreditsTable";
 import { ChevronRightIcon } from "@/components/icons";
 import { MobilePosterHero } from "@/components/show/Poster";
 import ShowSummary from "@/components/show/ShowSummary";
+import SetlistView from "@/components/show/SetlistView";
 import ShowTabs from "@/components/show/ShowTabs";
 import VenueInfo from "@/components/show/VenueInfo";
 import { formatDate } from "@/lib/format";
+import { normalizeSetlist } from "@/lib/setlist";
 import { getPastShow } from "@/lib/show";
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
@@ -22,6 +24,7 @@ export default async function PastShowPage({ params }: { params: { id: string } 
   if (!show) notFound();
 
   const period = show.dateLabel || (show.sessions[0] ? formatDate(show.sessions[0].date) : "");
+  const setlist = normalizeSetlist(show.setlist);
   const tabs = [
     {
       id: "info",
@@ -29,9 +32,10 @@ export default async function PastShowPage({ params }: { params: { id: string } 
       content: show.introText ? (
         <ShowText text={show.introText} />
       ) : (
-        <p className="text-ui text-ink-3">이 공연의 소개와 셋리스트를 정리하고 있어요.</p>
+        <p className="text-ui text-ink-3">이 공연의 소개를 정리하고 있어요.</p>
       ),
     },
+    ...(setlist.length ? [{ id: "setlist", label: "셋리스트", content: <SetlistView sections={setlist} /> }] : []),
     ...(show.credits.trim() ? [{ id: "credits", label: "크레딧", content: <CreditsTable credits={show.credits} /> }] : []),
     ...(show.venue
       ? [{ id: "venue", label: "장소정보", content: <VenueInfo venue={show.venue} address={show.venueAddress} /> }]

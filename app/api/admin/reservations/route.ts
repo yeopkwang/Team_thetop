@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { RoleType } from "@prisma/client";
 import { requireRoleAtLeast } from "@/lib/auth-helpers";
 import { errorResponse } from "@/lib/http";
+import { expireOverdue } from "@/lib/reservations";
 
 const DEFAULT_LIMIT = 80;
 const MAX_LIMIT = 200;
@@ -19,6 +20,7 @@ export async function GET(req: Request) {
       ? Math.min(MAX_LIMIT, Math.max(1, Math.trunc(rawLimit)))
       : DEFAULT_LIMIT;
     const cursor = searchParams.get("cursor") || undefined;
+    if (!cursor) await expireOverdue();
 
     const reservations = await prisma.reservation.findMany({
       take: limit + 1,
@@ -29,6 +31,9 @@ export async function GET(req: Request) {
         status: true,
         qty: true,
         preferredPerformerName: true,
+        depositorName: true,
+        cancelReason: true,
+        expiresAt: true,
         createdAt: true,
         session: {
           select: {
@@ -56,6 +61,9 @@ export async function GET(req: Request) {
         status: r.status,
         qty: r.qty,
         preferredPerformerName: r.preferredPerformerName,
+        depositorName: r.depositorName,
+        cancelReason: r.cancelReason,
+        expiresAt: r.expiresAt,
         createdAt: r.createdAt,
         userId: r.user.id,
         userName: r.user.name || r.user.nickname || "사용자",

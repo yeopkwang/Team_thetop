@@ -49,6 +49,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       checkIn,
       member: ticket.reservation.user,
+      depositorName: ticket.reservation.depositorName,
       performance: {
         title: show.title,
         venue: show.venue,

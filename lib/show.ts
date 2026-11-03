@@ -1,6 +1,6 @@
 import { ShowStatus } from "@prisma/client";
 import { prisma } from "./prisma";
-import { SEAT_HOLDING_STATUSES } from "./reservations";
+import { SEAT_HOLDING_STATUSES, expireOverdue } from "./reservations";
 
 const withSessions = { sessions: { orderBy: { date: "asc" as const } } };
 
@@ -26,8 +26,9 @@ export async function getPastShow(id: string) {
   return prisma.show.findFirst({ where: { id, status: ShowStatus.ENDED }, include: withSessions });
 }
 
-// 공연의 회차별 잔여석.
+// 공연의 회차별 잔여석. 입금 기한이 지난 예매는 먼저 만료시켜 좌석을 돌려놓는다.
 export async function getSessionAvailability(show: CurrentShow) {
+  await expireOverdue({ sessionId: { in: show.sessions.map((s) => s.id) } });
   const reserved = await prisma.reservation.groupBy({
     by: ["sessionId"],
     where: {

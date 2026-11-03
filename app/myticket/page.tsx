@@ -7,9 +7,17 @@ import EmptyState from "@/components/EmptyState";
 import { CheckIcon, CopyIcon } from "@/components/icons";
 import TicketStub from "@/components/ticket/TicketStub";
 import { ApiError, apiFetch, getToken } from "@/lib/api-client";
-import { won } from "@/lib/format";
+import { formatSessionDate, won } from "@/lib/format";
 
-type Booking = { id: string; status: string; createdAt: string; quantity: number };
+type Booking = {
+  id: string;
+  status: string;
+  createdAt: string;
+  quantity: number;
+  expiresAt: string;
+  depositorName: string;
+  cancelReason: string;
+};
 type Ticket = { id: string; ticketCode: string; checkedInAt?: string | null };
 type ShowSummary = {
   title: string;
@@ -29,10 +37,10 @@ type View = "loading" | "login" | "error" | "ready";
 const CLOSED_MESSAGES: Record<string, string> = {
   CANCELLED: "예매를 취소했어요. 좌석이 남아 있으면 다시 예매할 수 있어요.",
   REFUNDED: "환불이 끝났어요. 좌석이 남아 있으면 다시 예매할 수 있어요.",
-  EXPIRED: "입금 기한이 지나 예매가 만료됐어요.",
+  EXPIRED: "입금 기한이 지나 예매가 만료됐어요. 이미 입금했다면 공연 문의처로 알려 주세요. 좌석이 남아 있으면 다시 예매할 수도 있어요.",
 };
 
-function PaymentGuide({ show }: { show: ShowSummary }) {
+function PaymentGuide({ show, booking }: { show: ShowSummary; booking: Booking }) {
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -70,11 +78,18 @@ function PaymentGuide({ show }: { show: ShowSummary }) {
           <dd>{show.paymentHolder}</dd>
         </div>
         <div className="flex justify-between gap-3">
+          <dt className="text-ink-2">입금자명</dt>
+          <dd className="font-semibold">{booking.depositorName || "관람객 본인 실명"}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
           <dt className="text-ink-2">입금 금액</dt>
           <dd className="text-lead font-bold text-ink">{won(show.price)}</dd>
         </div>
       </dl>
-      <p className="mt-3 text-meta text-ink-2">입금자명은 관람객 본인의 실명으로 해 주세요.</p>
+      <p className="mt-3 border-t border-wait-700/15 pt-3 text-meta text-ink-2">
+        <strong className="font-semibold text-wait-700">{formatSessionDate(booking.expiresAt)}</strong>까지 입금해 주세요. 기한이
+        지나면 예매가 저절로 만료돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.
+      </p>
     </section>
   );
 }
@@ -187,7 +202,11 @@ export default function MyTicketPage() {
     );
   } else {
     const { booking, show } = data;
-    const closed = CLOSED_MESSAGES[booking.status];
+    // 운영진이 취소한 예매는 사유를 함께 보여 준다.
+    const closed =
+      booking.status === "CANCELLED" && booking.cancelReason
+        ? `운영진이 예매를 취소했어요. 사유: ${booking.cancelReason}`
+        : CLOSED_MESSAGES[booking.status];
 
     body = (
       <div className="mx-auto max-w-[400px] space-y-4">
@@ -196,7 +215,7 @@ export default function MyTicketPage() {
             예매가 접수됐어요. 아래 계좌로 입금하면 예매가 완료돼요.
           </p>
         )}
-        {booking.status === "PAYMENT_PENDING" && <PaymentGuide show={show} />}
+        {booking.status === "PAYMENT_PENDING" && <PaymentGuide show={show} booking={booking} />}
 
         <TicketStub
           show={show}
@@ -220,11 +239,9 @@ export default function MyTicketPage() {
           {closed && (
             <div className="text-center">
               <p className="text-ui text-ink-2">{closed}</p>
-              {booking.status !== "EXPIRED" && (
-                <Link href="/book" className="btn-primary mt-4">
-                  다시 예매하기
-                </Link>
-              )}
+              <Link href="/book" className="btn-primary mt-4">
+                다시 예매하기
+              </Link>
             </div>
           )}
         </TicketStub>

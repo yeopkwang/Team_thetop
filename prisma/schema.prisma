@@ -107,8 +107,14 @@ model Show {
   salesText      String     @default("")
   // 크레딧(공연자 명단). 한 줄에 "파트: 이름, 이름". 예매할 때 관심 있는 공연자를 이 명단에서 고른다.
   credits        String     @default("")
+  // 셋리스트와 곡별 크레딧. [{ name: "1부", songs: [{ title, artist, lineup: [{ role, names }] }] }]
+  setlist        Json       @default("[]")
+  // 판매 중에도 셋리스트를 보여 줄지. 지난 공연은 늘 보여 준다.
+  setlistPublic  Boolean    @default(false)
   // 티켓 오픈 일시. 비워 두면 판매 중으로 바꾸는 즉시 예매를 받는다.
   salesOpenAt    DateTime?
+  // 예매 후 이 시간 안에 입금하지 않으면 예매가 만료된다. 0이면 공연 시작 때까지 기다린다.
+  paymentHours   Int        @default(24)
   status         ShowStatus @default(DRAFT)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
@@ -135,8 +141,13 @@ model Reservation {
   sessionId              String
   qty                    Int
   preferredPerformerName String            @default("없음")
+  // 통장에 찍힐 입금자명(관람객 실명). 입금 확인과 입장 확인에 쓴다.
+  depositorName          String            @default("")
   status                 ReservationStatus @default(REQUESTED)
+  // 입금 기한. 지나면 EXPIRED로 바뀌고 좌석이 풀린다.
   expiresAt              DateTime
+  // 운영진이 취소했을 때 사유. 관객이 직접 취소하면 빈 값이다.
+  cancelReason           String            @default("")
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
 
@@ -147,6 +158,7 @@ model Reservation {
 
   @@index([userId, createdAt])
   @@index([createdAt, id])
+  @@index([status, expiresAt])
 }
 
 model Ticket {

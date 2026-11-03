@@ -6,12 +6,15 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/auth-helpers";
 import { errorResponse } from "@/lib/http";
 import { getCurrentShow } from "@/lib/show";
+import { expireOverdue } from "@/lib/reservations";
 
 export async function GET() {
   try {
     const session = await requireSession();
     const show = await getCurrentShow();
     if (!show) return NextResponse.json({ booking: null, tickets: [], show: null });
+
+    await expireOverdue({ userId: session.user.id });
 
     // 지난 공연의 예매가 아니라, 지금 공연에서 가장 최근에 한 예매를 보여준다.
     const latestBooking = await prisma.reservation.findFirst({
@@ -47,6 +50,9 @@ export async function GET() {
         status: latestBooking.status,
         createdAt: latestBooking.createdAt,
         quantity: latestBooking.qty,
+        expiresAt: latestBooking.expiresAt,
+        depositorName: latestBooking.depositorName,
+        cancelReason: latestBooking.cancelReason,
       },
       tickets: tickets.map((ticket) => ({
         id: ticket.id,

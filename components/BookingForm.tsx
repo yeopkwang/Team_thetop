@@ -20,6 +20,7 @@ type ShowProps = {
   paymentBank: string;
   paymentAccount: string;
   paymentHolder: string;
+  paymentHours: number;
   salesOpenAt: string | null;
 };
 
@@ -64,6 +65,7 @@ export default function BookingForm({
   // 크레딧이 있으면 목록에서 고르고, 목록에 없으면 직접 적는다. 크레딧이 없으면 처음부터 직접 적는다.
   const [choice, setChoice] = useState("");
   const [typed, setTyped] = useState("");
+  const [depositor, setDepositor] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
@@ -88,7 +90,7 @@ export default function BookingForm({
   const performer = performers.length > 0 && choice !== OTHER ? choice : typed.trim();
   const selected = sessions.find((s) => s.id === sessionId);
   const loginHref = `/login?next=${encodeURIComponent(`/book${sessionId ? `?session=${sessionId}` : ""}`)}`;
-  const ready = Boolean(loggedIn && !existing && state === "open" && selected && performer && agreed);
+  const ready = Boolean(loggedIn && !existing && state === "open" && selected && performer && depositor.trim() && agreed);
 
   const missing = !loggedIn
     ? "로그인하면 예매할 수 있어요."
@@ -102,7 +104,9 @@ export default function BookingForm({
             ? "예매할 수 있는 회차가 없어요."
             : !performer
               ? "관심 있는 공연자를 골라 주세요."
-              : !agreed
+              : !depositor.trim()
+                ? "입금자명을 적어 주세요."
+                : !agreed
                 ? "취소·환불 규정에 동의해 주세요."
                 : "";
 
@@ -113,7 +117,7 @@ export default function BookingForm({
     try {
       await apiFetch("/bookings", {
         method: "POST",
-        bodyJson: { eventId: sessionId, quantity: 1, preferredPerformerName: performer },
+        bodyJson: { eventId: sessionId, quantity: 1, preferredPerformerName: performer, depositorName: depositor.trim() },
       });
       window.location.href = "/myticket?booked=1";
     } catch (error: unknown) {
@@ -266,7 +270,7 @@ export default function BookingForm({
               )}
             </Step>
 
-            <Step n={3} title="입금 방법">
+            <Step n={3} title="입금 정보">
               <div className="rounded-lg border border-line">
                 <div className="flex items-center justify-between border-b border-line px-4 py-3">
                   <span className="text-[15px] font-semibold">무통장 입금</span>
@@ -289,8 +293,27 @@ export default function BookingForm({
                   </div>
                 </dl>
               </div>
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-meta text-ink-2">
-                <li>입금자명은 관람객 본인의 실명으로 해 주세요.</li>
+              <div className="mt-4">
+                <label htmlFor="depositor" className="label">
+                  입금자명
+                </label>
+                <input
+                  id="depositor"
+                  value={depositor}
+                  onChange={(e) => setDepositor(e.target.value)}
+                  placeholder="관람객 본인 실명 (예: 홍길동)"
+                  maxLength={20}
+                  autoComplete="name"
+                  className="field mt-1.5"
+                />
+                <p className="mt-1.5 text-meta text-ink-3">통장에 찍히는 이름과 같아야 입금을 확인할 수 있어요. 입장할 때도 이 이름으로 확인해요.</p>
+              </div>
+              <ul className="mt-4 list-disc space-y-1 pl-5 text-meta text-ink-2">
+                <li>
+                  {show.paymentHours > 0
+                    ? `예매하고 ${show.paymentHours}시간 안에 입금해 주세요. 기한이 지나면 예매가 저절로 만료돼요.`
+                    : "공연 시작 전까지 입금해 주세요."}
+                </li>
                 <li>입금이 확인되면 마이 티켓에 입장용 QR 티켓이 발급돼요.</li>
               </ul>
             </Step>
@@ -317,6 +340,10 @@ export default function BookingForm({
                 <div className="flex justify-between gap-4">
                   <dt className="text-ink-3">매수</dt>
                   <dd>1매 (1인 1매)</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-ink-3">입금자명</dt>
+                  <dd className="truncate text-right">{depositor.trim() || "적지 않음"}</dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-4 border-t border-line pt-3">
                   <dt className="font-semibold">총 결제금액</dt>

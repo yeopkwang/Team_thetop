@@ -37,6 +37,7 @@ export default async function BookPage({ searchParams }: { searchParams: { sessi
         paymentBank: show.paymentBank,
         paymentAccount: show.paymentAccount,
         paymentHolder: show.paymentHolder,
+        paymentHours: show.paymentHours,
         salesOpenAt: show.salesOpenAt?.toISOString() ?? null,
       }}
       sessions={sessions.map((s) => ({

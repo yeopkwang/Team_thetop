@@ -7,10 +7,12 @@ import CreditsTable from "@/components/show/CreditsTable";
 import MobileBookingBar from "@/components/show/MobileBookingBar";
 import { MobilePosterHero } from "@/components/show/Poster";
 import SalesInfoTable from "@/components/show/SalesInfoTable";
+import SetlistView from "@/components/show/SetlistView";
 import ShowSummary from "@/components/show/ShowSummary";
 import ShowTabs from "@/components/show/ShowTabs";
 import VenueInfo from "@/components/show/VenueInfo";
 import { formatDate, formatTime, kstDayKey } from "@/lib/format";
+import { normalizeSetlist } from "@/lib/setlist";
 import { getCurrentShow, getSessionAvailability } from "@/lib/show";
 
 export const metadata: Metadata = { title: "공연 안내" };
@@ -36,6 +38,8 @@ export default async function ShowPage() {
     : kstDayKey(first.date) === kstDayKey(last.date)
       ? formatDate(first.date)
       : `${formatDate(first.date)} ~ ${formatDate(last.date)}`;
+  // 판매 중인 공연의 셋리스트는 관리자가 공개로 둔 경우에만 보인다(스포일러를 막으려고).
+  const setlist = show.setlistPublic ? normalizeSetlist(show.setlist) : [];
 
   const tabs = [
     {
@@ -53,6 +57,7 @@ export default async function ShowPage() {
         </div>
       ),
     },
+    ...(setlist.length ? [{ id: "setlist", label: "셋리스트", content: <SetlistView sections={setlist} /> }] : []),
     ...(show.credits.trim() ? [{ id: "credits", label: "크레딧", content: <CreditsTable credits={show.credits} /> }] : []),
     {
       id: "sales",

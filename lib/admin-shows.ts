@@ -2,7 +2,8 @@ import { Prisma, ShowStatus } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "./prisma";
 import { HttpError } from "./http";
-import { SEAT_HOLDING_STATUSES } from "./reservations";
+import { SEAT_HOLDING_STATUSES, expireOverdue } from "./reservations";
+import { normalizeSetlist } from "./setlist";
 import { logAudit } from "./audit";
 
 const text = z.string().trim().max(10000).default("");
@@ -27,6 +28,18 @@ export const showInput = z.object({
   introText: text,
   salesText: text,
   credits: text,
+  // 모양은 normalizeSetlist가 정리한다(빈 곡·빈 묶음은 버린다).
+  setlist: z
+    .unknown()
+    .optional()
+    .transform((v) => normalizeSetlist(v) as unknown as Prisma.InputJsonValue),
+  setlistPublic: z.boolean().default(false),
+  paymentHours: z.coerce
+    .number()
+    .int("입금 기한은 시간 단위로 적어 주세요.")
+    .min(0, "입금 기한은 0시간 이상이어야 합니다.")
+    .max(24 * 14, "입금 기한은 2주(336시간)까지 정할 수 있어요.")
+    .default(24),
   salesOpenAt: z
     .string()
     .datetime({ message: "티켓 오픈 일시가 올바르지 않습니다." })
@@ -59,6 +72,7 @@ async function seatHolding(sessionIds: string[], db: Prisma.TransactionClient = 
 
 // 공연 관리 목록: 최근 공연부터, 회차 날짜와 좌석을 잡은 예매 수를 함께.
 export async function listShows() {
+  await expireOverdue();
   const shows = await prisma.show.findMany({
     include: { sessions: { orderBy: { date: "asc" }, select: { id: true, date: true, totalCapacity: true } } },
   });
@@ -131,6 +145,7 @@ export async function updateShow(id: string, input: ShowInput, actorUserId: stri
     if (current.session) {
       // 예매 API와 같은 행을 잠그고 세야, 세는 사이에 들어온 예매까지 반영된다.
       await tx.$queryRaw`SELECT id FROM "ShowSession" WHERE id = ${current.session.id} FOR UPDATE`;
+      await expireOverdue({ sessionId: current.session.id }, tx);
       const reservedQty = await seatHolding([current.session.id], tx);
       if (sessionInput.totalCapacity < reservedQty) {
         throw new HttpError(400, `이미 ${reservedQty}명이 예매해서 정원을 그보다 줄일 수 없습니다.`);

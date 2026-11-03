@@ -11,6 +11,9 @@ type ReservationItem = {
   status: string;
   qty: number;
   preferredPerformerName: string;
+  depositorName: string;
+  cancelReason: string;
+  expiresAt: string;
   createdAt: string;
   userId: string;
   userName: string;
@@ -20,7 +23,7 @@ type ReservationItem = {
 
 type ReservationListResponse = { reservations: ReservationItem[]; nextCursor: string | null };
 
-const CACHE_KEY = "admin_reservations_cache_v1";
+const CACHE_KEY = "admin_reservations_cache_v2";
 const PAGE_LIMIT = 80;
 
 const FILTERS = [
@@ -39,6 +42,7 @@ export default function AdminReservationsPage() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
 
   const load = async (cursor?: string) => {
     const isLoadMore = Boolean(cursor);
@@ -82,6 +86,46 @@ export default function AdminReservationsPage() {
     void load();
   }, []);
 
+  // 입금 확인·운영진 취소·만료 예매 되살리기. 처리한 뒤 목록을 새로 받는다.
+  const act = async (r: ReservationItem, kind: "confirm" | "cancel") => {
+    const who = r.depositorName || r.userName;
+    let body: Record<string, unknown> = {};
+    if (kind === "cancel") {
+      const reason = window.prompt(`${who}님 예매를 취소할까요? 취소 사유를 적어 주세요. 관객의 마이 티켓에 보여요.`, "입금 기한 안에 입금이 확인되지 않았어요.");
+      if (!reason?.trim()) return;
+      body = { reason: reason.trim() };
+    }
+    setBusy(r.id);
+    setMessage("");
+    try {
+      await apiFetch(`/admin/bookings/${r.id}/${kind}`, { method: "POST", bodyJson: body });
+      setMessage(kind === "confirm" ? `${who}님 입금을 확인했어요. QR 티켓이 발급됐어요.` : `${who}님 예매를 취소했어요.`);
+      await load();
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : "처리하지 못했어요.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const actions = (r: ReservationItem) =>
+    r.status === "PAYMENT_PENDING" || r.status === "REQUESTED" ? (
+      <span className="flex justify-end gap-1">
+        <button type="button" disabled={busy !== null} onClick={() => void act(r, "confirm")} className="btn-primary btn-sm">
+          입금 확인
+        </button>
+        <button type="button" disabled={busy !== null} onClick={() => void act(r, "cancel")} className="btn-ghost btn-sm text-ink-3">
+          취소
+        </button>
+      </span>
+    ) : r.status === "EXPIRED" ? (
+      <span className="flex justify-end">
+        <button type="button" disabled={busy !== null} onClick={() => void act(r, "confirm")} className="btn-secondary btn-sm">
+          되살리기
+        </button>
+      </span>
+    ) : null;
+
   const counts = useMemo(
     () =>
       Object.fromEntries(
@@ -96,7 +140,7 @@ export default function AdminReservationsPage() {
     return items.filter((r) => {
       if (statuses && !statuses.includes(r.status)) return false;
       if (!q) return true;
-      return [r.userName, r.userEmail || "", r.preferredPerformerName, bookingNumber(r.id), r.event?.title || ""]
+      return [r.depositorName, r.userName, r.userEmail || "", r.preferredPerformerName, bookingNumber(r.id), r.event?.title || ""]
         .join(" ")
         .toLowerCase()
         .includes(q);
@@ -129,7 +173,7 @@ export default function AdminReservationsPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="이름, 관심 공연자, 예매번호, 공연명으로 검색"
+            placeholder="입금자명, 이름, 관심 공연자, 예매번호로 검색"
             className="field"
           />
         </label>
@@ -149,10 +193,13 @@ export default function AdminReservationsPage() {
               <tr>
                 <th className="px-3 py-2.5 font-semibold">예매번호</th>
                 <th className="px-3 py-2.5 font-semibold">공연</th>
-                <th className="px-3 py-2.5 font-semibold">예매자</th>
+                <th className="px-3 py-2.5 font-semibold">입금자명</th>
                 <th className="px-3 py-2.5 font-semibold">관심 공연자</th>
                 <th className="px-3 py-2.5 font-semibold">상태</th>
                 <th className="px-3 py-2.5 text-right font-semibold">예매일시</th>
+                <th className="px-3 py-2.5">
+                  <span className="sr-only">처리</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -163,14 +210,16 @@ export default function AdminReservationsPage() {
                     <td className="px-3 py-3 font-semibold tabular-nums tracking-wide">{bookingNumber(r.id)}</td>
                     <td className="px-3 py-3 text-ink-2">{r.event?.title || "-"}</td>
                     <td className="px-3 py-3">
-                      {r.userName}
-                      {r.userEmail && <span className="block text-cap text-ink-3">{r.userEmail}</span>}
+                      {r.depositorName || r.userName}
+                      <span className="block text-cap text-ink-3">카카오 {r.userName}</span>
                     </td>
                     <td className="px-3 py-3 text-ink-2">{r.preferredPerformerName}</td>
                     <td className="px-3 py-3">
                       <StatusBadge label={s.label} tone={s.tone} />
+                      {r.cancelReason && <span className="mt-1 block max-w-[180px] text-cap text-ink-3">{r.cancelReason}</span>}
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums text-ink-2">{formatDateTime(r.createdAt)}</td>
+                    <td className="px-3 py-3">{actions(r)}</td>
                   </tr>
                 );
               })}
@@ -184,7 +233,7 @@ export default function AdminReservationsPage() {
               return (
                 <li key={r.id} className="py-3.5">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-[15px] font-semibold">{r.userName}</p>
+                    <p className="text-[15px] font-semibold">{r.depositorName || r.userName}</p>
                     <StatusBadge label={s.label} tone={s.tone} />
                   </div>
                   <p className="mt-1 text-meta text-ink-3">
@@ -198,7 +247,12 @@ export default function AdminReservationsPage() {
                     <span className="mx-1.5 text-line-strong">|</span>
                     {bookingNumber(r.id)}
                   </p>
-                  <p className="text-meta text-ink-3">{formatDateTime(r.createdAt)} 예매</p>
+                  <p className="text-meta text-ink-3">
+                    {formatDateTime(r.createdAt)} 예매
+                    {r.depositorName && `, 카카오 ${r.userName}`}
+                  </p>
+                  {r.cancelReason && <p className="text-meta text-ink-3">취소 사유: {r.cancelReason}</p>}
+                  {actions(r) && <div className="mt-2">{actions(r)}</div>}
                 </li>
               );
             })}

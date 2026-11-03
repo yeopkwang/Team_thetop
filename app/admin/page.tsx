@@ -1,23 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import PendingDeposits from "@/components/admin/PendingDeposits";
 import { CameraIcon, CheckIcon } from "@/components/icons";
 import { apiFetch } from "@/lib/api-client";
 import { bookingNumber, formatDateTime } from "@/lib/format";
 
-type PendingBooking = {
-  booking: {
-    id: string;
-    createdAt: string;
-    preferredPerformerName: string;
-    user?: { email?: string | null; name?: string | null };
-    event?: { title?: string };
-  };
-};
-
 type CheckInResponse = {
   checkIn: { id: string; createdAt: string };
   member: { id: string; name?: string | null; email?: string | null };
+  depositorName?: string;
   ticket: { id: string; qrToken: string; reservationId: string };
 };
 
@@ -49,10 +41,6 @@ const loadHtml5QrcodeCtor = async (): Promise<Html5QrcodeCtor> => {
 type ScanOutcome = { ok: true; data: CheckInResponse } | { ok: false; message: string };
 
 export default function AdminPage() {
-  const [list, setList] = useState<PendingBooking[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [listMessage, setListMessage] = useState("");
-  const [confirming, setConfirming] = useState<string | null>(null);
   const [scanToken, setScanToken] = useState("");
   const [outcome, setOutcome] = useState<ScanOutcome | null>(null);
   const [scannerOn, setScannerOn] = useState(false);
@@ -61,38 +49,11 @@ export default function AdminPage() {
   const scannerRef = useRef<Html5QrcodeInstance | null>(null);
   const scanLockRef = useRef(false);
 
-  const loadPending = async () => {
-    setLoading(true);
-    try {
-      const data = await apiFetch<PendingBooking[]>("/admin/bookings/pending");
-      setList(Array.isArray(data) ? data : []);
-    } catch (error: unknown) {
-      setListMessage(error instanceof Error ? error.message : "입금 대기 목록을 불러오지 못했어요.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    void loadPending();
     return () => {
       void stopScanner();
     };
   }, []);
-
-  const confirmBooking = async (item: PendingBooking["booking"]) => {
-    setConfirming(item.id);
-    setListMessage("");
-    try {
-      await apiFetch(`/admin/bookings/${item.id}/confirm`, { method: "POST", bodyJson: {} });
-      setListMessage(`${item.user?.name || "예매자"}님 입금을 확인했어요. QR 티켓이 발급됐어요.`);
-      await loadPending();
-    } catch (error: unknown) {
-      setListMessage(error instanceof Error ? error.message : "입금 확인을 처리하지 못했어요.");
-    } finally {
-      setConfirming(null);
-    }
-  };
 
   const processCheckIn = async (qrToken: string) => {
     if (!qrToken) return;
@@ -209,8 +170,12 @@ export default function AdminPage() {
                   입장 확인
                 </p>
                 <p className="mt-2 text-ui text-ink">
-                  {outcome.data.member.name || "관객"}님, 예매번호 {bookingNumber(outcome.data.ticket.reservationId)}
+                  <strong className="text-lead font-bold">{outcome.data.depositorName || outcome.data.member.name || "관객"}</strong>님, 예매번호{" "}
+                  {bookingNumber(outcome.data.ticket.reservationId)}
                 </p>
+                {outcome.data.depositorName && outcome.data.member.name && outcome.data.member.name !== outcome.data.depositorName && (
+                  <p className="text-meta text-ink-2">카카오 이름 {outcome.data.member.name}</p>
+                )}
                 <p className="text-meta text-ink-2">{formatDateTime(outcome.data.checkIn.createdAt)} 입장 처리</p>
               </>
             ) : (
@@ -244,54 +209,7 @@ export default function AdminPage() {
         </form>
       </section>
 
-      <section aria-labelledby="pending-title">
-        <div className="flex items-baseline justify-between">
-          <h2 id="pending-title" className="text-lead font-bold">
-            입금 확인 대기 <span className="text-brand-600">{loading ? "" : list.length}</span>
-          </h2>
-          <button type="button" onClick={() => void loadPending()} className="btn-ghost text-meta">
-            새로고침
-          </button>
-        </div>
-        <p className="mt-1 text-meta text-ink-3">통장에 들어온 입금자명과 예매자 이름을 맞춰 보고 확인해 주세요.</p>
-
-        {listMessage && (
-          <p role="status" className="mt-4 rounded-md bg-surface px-4 py-3 text-meta text-ink-2">
-            {listMessage}
-          </p>
-        )}
-
-        <ul className="mt-4 divide-y divide-line border-y border-line">
-          {loading && <li className="py-6 text-center text-meta text-ink-3">불러오는 중</li>}
-          {!loading && list.length === 0 && (
-            <li className="py-10 text-center text-ui text-ink-3">입금 확인을 기다리는 예매가 없어요.</li>
-          )}
-          {list.map(({ booking }) => (
-            <li key={booking.id} className="flex items-center justify-between gap-4 py-4">
-              <div className="min-w-0">
-                <p className="text-[15px] font-semibold">{booking.user?.name || booking.user?.email || "이름 없음"}</p>
-                <p className="mt-0.5 text-meta text-ink-3">
-                  관심 공연자 {booking.preferredPerformerName}
-                  <span className="mx-1.5 text-line-strong">|</span>
-                  {bookingNumber(booking.id)}
-                </p>
-                <p className="text-meta text-ink-3">
-                  {booking.event?.title ? `${booking.event.title}, ` : ""}
-                  {formatDateTime(booking.createdAt)} 예매
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={confirming === booking.id}
-                onClick={() => void confirmBooking(booking)}
-                className="btn-primary btn-sm shrink-0"
-              >
-                {confirming === booking.id ? "확인 중" : "입금 확인"}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <PendingDeposits />
     </div>
   );
 }

@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import { performerNames } from "@/lib/credits";
+import { normalizeSetlist } from "@/lib/setlist";
 import { SHOW_STATUS, type ShowStatusKey } from "@/lib/status";
+import SetlistEditor, { fromEditSetlist, setlistColumns, toEditSetlist, type EditSection } from "./SetlistEditor";
 
 type FormState = {
   title: string;
@@ -27,16 +29,20 @@ type FormState = {
   introText: string;
   salesText: string;
   credits: string;
+  setlist: EditSection[];
+  setlistPublic: boolean;
   salesOpenAt: string;
+  paymentHours: number;
   status: ShowStatusKey;
   sessionDate: string;
   totalCapacity: number;
 };
 
-type ShowDetail = Omit<FormState, "posterUrl" | "sessionDate" | "totalCapacity" | "salesOpenAt"> & {
+type ShowDetail = Omit<FormState, "posterUrl" | "sessionDate" | "totalCapacity" | "salesOpenAt" | "setlist"> & {
   id: string;
   posterUrl: string | null;
   salesOpenAt: string | null;
+  setlist: unknown;
   session: { title: string; date: string; totalCapacity: number } | null;
   reservedQty: number;
 };
@@ -61,7 +67,10 @@ const EMPTY: FormState = {
   introText: "",
   salesText: "",
   credits: "",
+  setlist: [],
+  setlistPublic: false,
   salesOpenAt: "",
+  paymentHours: 24,
   status: "DRAFT",
   sessionDate: "",
   totalCapacity: 100,
@@ -83,6 +92,7 @@ const CARRY_OVER: (keyof FormState)[] = [
   "paymentHolder",
   "refundContact",
   "salesText",
+  "paymentHours",
   "totalCapacity",
 ];
 
@@ -94,10 +104,11 @@ function toLocalInput(iso: string) {
 }
 
 function toForm(show: ShowDetail): FormState {
-  const { session, reservedQty: _r, posterUrl, salesOpenAt, id: _id, ...fields } = show;
+  const { session, reservedQty: _r, posterUrl, salesOpenAt, setlist, id: _id, ...fields } = show;
   return {
     ...EMPTY,
     ...fields,
+    setlist: toEditSetlist(normalizeSetlist(setlist)),
     posterUrl: posterUrl || "",
     salesOpenAt: salesOpenAt ? toLocalInput(salesOpenAt) : "",
     sessionDate: session ? toLocalInput(session.date) : "",
@@ -122,7 +133,8 @@ function Group({ title, description, children }: { title: string; description?: 
         <h2 className="text-lead font-bold">{title}</h2>
         {description && <p className="mt-1 text-meta text-ink-3">{description}</p>}
       </div>
-      <div className="space-y-4">{children}</div>
+      {/* min-w-0: 넓은 표(셋리스트)가 칸을 밀어내지 않고 안에서 가로로 스크롤되게 */}
+      <div className="min-w-0 space-y-4">{children}</div>
     </section>
   );
 }
@@ -179,9 +191,10 @@ export default function ShowForm({ showId }: { showId?: string }) {
     setSaving(true);
     setMessage("");
     try {
-      const { sessionDate, totalCapacity, salesOpenAt, ...fields } = form;
+      const { sessionDate, totalCapacity, salesOpenAt, setlist, ...fields } = form;
       const body = {
         ...fields,
+        setlist: fromEditSetlist(setlist, setlistColumns(form.credits, setlist)),
         salesOpenAt: salesOpenAt ? new Date(salesOpenAt).toISOString() : null,
         session: { date: new Date(sessionDate).toISOString(), totalCapacity },
       };
@@ -279,6 +292,26 @@ export default function ShowForm({ showId }: { showId?: string }) {
               비우기
             </button>
           )}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <Field
+            label="입금 기한 (예매 후 몇 시간)"
+            hint={
+              form.paymentHours > 0
+                ? `예매하고 ${form.paymentHours}시간 안에 입금하지 않으면 예매가 저절로 만료되고 좌석이 다른 관객에게 돌아가요. 공연 시작 시각을 넘기지는 않아요.`
+                : "0으로 두면 공연 시작 때까지 입금을 기다려요."
+            }
+          >
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={336}
+              className="field sm:max-w-[200px]"
+              value={form.paymentHours}
+              onChange={(e) => set("paymentHours", Number(e.target.value))}
+            />
+          </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="공연 일시">
@@ -388,6 +421,30 @@ export default function ShowForm({ showId }: { showId?: string }) {
         )}
       </Group>
 
+      <Group
+        title="셋리스트"
+        description="곡마다 무대에 서는 사람을 적어요. 파트 열은 크레딧에 적은 파트를 따라요. 엑셀·구글 시트에서 표를 복사해 곡명 칸에 붙여 넣으면 한 번에 채워져요."
+      >
+        <SetlistEditor
+          value={form.setlist}
+          onChange={(next) => set("setlist", next)}
+          credits={form.credits}
+          introText={form.introText}
+        />
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-md bg-surface p-3 text-ui">
+          <input
+            type="checkbox"
+            checked={form.setlistPublic}
+            onChange={(e) => set("setlistPublic", e.target.checked)}
+            className="mt-1 h-4 w-4 shrink-0 accent-brand-600"
+          />
+          <span>
+            판매 중에도 공연 안내에 셋리스트 보이기
+            <span className="block text-meta text-ink-3">끄면 공연이 끝나 지난 공연으로 옮긴 뒤부터 보여요. 스포일러가 걱정되면 꺼 두세요.</span>
+          </span>
+        </label>
+      </Group>
+
       <Group title="입금·환불" description="예매 화면과 마이 티켓의 입금 안내, 판매정보 표에 나와요.">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="은행">
@@ -406,7 +463,7 @@ export default function ShowForm({ showId }: { showId?: string }) {
       </Group>
 
       <Group title="긴 안내문" description="빈 줄로 묶음을 나눠요. 묶음의 첫 줄을 '# 제목'으로 쓰면 소제목이 붙어요.">
-        <Field label="공연정보 탭" hint="공연 소개, 셋리스트 등. 지난 공연 화면에도 이 내용이 나와요.">
+        <Field label="공연정보 탭" hint="공연 소개 등. 지난 공연 화면에도 이 내용이 나와요. 셋리스트는 위 셋리스트 칸에 적어 주세요.">
           <textarea rows={14} className="field text-ui leading-7" {...text("introText")} />
         </Field>
         <Field label="판매정보 탭" hint="공연 개요, 관람료, 환불 기준, 입장 안내 등">
