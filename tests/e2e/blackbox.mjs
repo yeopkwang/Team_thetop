@@ -1,7 +1,7 @@
 // 블랙박스 시험: 실행 중인 앱에 HTTP 요청을 보내고 응답(상태 코드·문구·화면 HTML)만 보고 판정한다.
 // 카카오 로그인은 자동화할 수 없어서, 관객 계정을 DB에 만들고 같은 비밀값으로 토큰을 서명해 쓴다.
 // 기한이 지나는 상황도 DB에서 기한만 앞당겨 만든다. 판정은 늘 앱의 응답으로 한다.
-// tests/e2e/run.mjs가 DB 준비·서버 실행을 맡는다. 직접 돌리려면 E2E_BASE, E2E_DB, JWT_SECRET, SEED_ADMIN_PASSWORD가 필요하다.
+// tests/e2e/run.mjs가 DB 준비·서버 실행을 맡는다. 직접 돌리려면 E2E_BASE, E2E_DB, JWT_SECRET, SEED_ADMIN_PASSWORD, CRON_SECRET이 필요하다.
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import bcrypt from "bcryptjs";
@@ -134,6 +134,14 @@ check(
   "넘김 쿠키가 있으면 토큰을 한 번 주고 쿠키를 지운다",
   handoff.status === 200 && (await handoff.json()).token === audience.token && /kakao_handoff=;/.test(handoff.headers.get("set-cookie") || "")
 );
+
+section("A-3. DB 깨우기 주소 (Vercel Cron만 부를 수 있다)");
+const cron = process.env.CRON_SECRET;
+check("비밀값 없이 부르면 401", (await api("/cron/keepalive")).status === 401);
+check("다른 비밀값이면 401", (await api("/cron/keepalive", { token: cron.slice(0, -1) + "x" })).status === 401);
+check("로그인 토큰(운영진)으로도 못 부른다", (await api("/cron/keepalive", { token: admin })).status === 401);
+const woke = await api("/cron/keepalive", { token: cron });
+check("Vercel이 보내는 'Bearer 비밀값'이면 DB를 읽고 200", woke.status === 200 && woke.data?.ok === true);
 
 // ======================================================================
 section("B. 공연 설정 (경계값 · 동등 분할 · 동시 저장)");

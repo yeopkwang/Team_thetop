@@ -70,6 +70,7 @@ npm run dev                   # http://localhost:3000
 | `DIRECT_URL` | 마이그레이션용 DB 주소. Supabase는 세션 연결(5432) |
 | `APP_URL` | 서비스 주소(끝에 `/` 없이). 카카오 Redirect URI가 `APP_URL/api/auth/kakao/callback` |
 | `JWT_SECRET` | 로그인 토큰 서명 키. 32자 이상 무작위 문자열. 없으면 로그인이 동작하지 않습니다 |
+| `CRON_SECRET` | DB 깨우기 주소(`/api/cron/keepalive`)를 Vercel Cron만 부를 수 있게 하는 값. 32자 이상 무작위 문자열. 운영(Production)에만 넣으면 됩니다 |
 | `KAKAO_CLIENT_ID` / `KAKAO_CLIENT_SECRET` | 카카오 REST API 키 / Client Secret |
 | `KAKAO_LOGOUT_REDIRECT_URI` | 카카오 로그아웃 뒤 돌아올 주소. 카카오 콘솔에 등록 필요 |
 | `SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD` | `npm run prisma:seed`가 만드는 관리자 계정(비밀번호 10자 이상). 시드 때만 필요 |
@@ -80,14 +81,16 @@ npm run dev                   # http://localhost:3000
 
 1. Supabase에서 프로젝트를 만들고(지역은 **서울**) 연결 문자열 두 개를 받습니다.
 2. 내 컴퓨터에서 `.env`에 그 값을 넣고 `npm run prisma:deploy`, `npm run prisma:seed`를 실행합니다.
-3. Vercel 프로젝트 환경변수에 `DATABASE_URL`, `DIRECT_URL`, `APP_URL`, `JWT_SECRET`, 카카오 값 3개를 넣습니다.
+3. Vercel 프로젝트 환경변수에 `DATABASE_URL`, `DIRECT_URL`, `APP_URL`, `JWT_SECRET`, `CRON_SECRET`, 카카오 값 3개를 넣습니다.
 4. 카카오 개발자 콘솔에 Redirect URI와 로그아웃 Redirect URI를 등록합니다.
 5. Vercel이 배포하는 브랜치에 푸시합니다. 빌드는 `prisma generate && next build`입니다.
 
 Vercel 서버 지역은 `vercel.json`에서 서울(`icn1`)로 고정합니다. 기본값(미국 동부)으로 두면 서울 DB에 한 번 물을 때마다
 태평양을 왕복해서 관리자 화면이 몇 초씩 걸립니다. DB 지역을 바꾸면 이 값도 같은 곳으로 맞추세요.
 
-Supabase 무료 플랜은 오래 안 쓰면 프로젝트가 일시정지됩니다. 판매 시작 전에 대시보드에서 살아 있는지 확인하세요.
+Supabase 무료 플랜은 7일 동안 DB에 요청이 없으면 프로젝트를 일시정지합니다. 그래서 `vercel.json`의 `crons`로
+Vercel이 매일 한국 시간 새벽 3시 무렵 `/api/cron/keepalive`를 불러 DB를 한 번 가볍게 읽습니다(Hobby 플랜은 하루 한 번까지, 시각은 그 한 시간 안 어딘가).
+잘 돌고 있는지는 Vercel 프로젝트 > Settings > Cron Jobs에서 볼 수 있습니다. 그래도 판매 시작 전에는 Supabase 대시보드에서 한 번 확인하세요.
 
 ## 폴더
 
@@ -105,6 +108,7 @@ lib/
   reservations.ts                      입금 기한·만료, 회차·예매 행 잠금, 좌석 세기
   inputs.ts                            API 요청 본문의 모양과 오류 문구
   http.ts                              route() 껍데기, HttpError, 요청이 몰릴 때 503
+  cron.ts                              Vercel Cron 요청인지 확인(DB 깨우기 주소가 쓴다)
   auth-helpers.ts, jwt.ts              로그인 확인과 역할 검사, 토큰 서명
   status.ts                            예매·환불·공연 상태 묶음과 화면 문구(브라우저에서도 쓴다)
   show.ts, setlist*.ts, credits.ts     공연 조회, 셋리스트·크레딧 정리

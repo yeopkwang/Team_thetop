@@ -34,6 +34,7 @@ const env = {
   SEED_ADMIN_USERNAME: "admin",
   SEED_ADMIN_PASSWORD: "e2e-admin-pass-1234",
   KAKAO_CLIENT_ID: "e2e-kakao-client-id",
+  CRON_SECRET: "e2e-cron-secret-for-keepalive-0123456789",
 };
 delete env.DEMO_LOGIN;
 
