@@ -105,7 +105,7 @@ const PAST_SHOWS = [
     title: "작전명문 4",
     dateLabel: "2026년 02월 22일 (일)",
     date: "2026-02-22T09:00:00Z",
-    posterUrl: "/uploads/sample-poster.png",
+    posterUrl: "/posters/operation-moon-4.jpg",
     timeLabel: "18:00 ~ 21:00",
     timeSubLabel: "인터미션 포함 / 입장 가능 17:30",
     venue: "공덕 DGT 아트센터",

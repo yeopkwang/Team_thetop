@@ -17,13 +17,12 @@ enum RoleType {
   SUPER_ADMIN
 }
 
+// 입금 대기 → 예매 완료 → (환불 요청) 환불 대기 → 환불 완료. 입금 대기에서 취소·만료로 끝날 수 있다.
 enum ReservationStatus {
-  REQUESTED
   PAYMENT_PENDING
   CONFIRMED
   CANCELLED
   EXPIRED
-  REFUND_REQUESTED
   REFUND_PENDING
   REFUNDED
 }
@@ -41,7 +40,6 @@ enum ShowStatus {
 }
 
 enum RefundStatus {
-  REQUESTED
   PENDING
   REFUNDED
 }
@@ -52,7 +50,6 @@ model User {
   name      String?
   nickname  String?
   email     String?  @unique
-  image     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -143,7 +140,7 @@ model Reservation {
   preferredPerformerName String            @default("없음")
   // 통장에 찍힐 입금자명(관람객 실명). 입금 확인과 입장 확인에 쓴다.
   depositorName          String            @default("")
-  status                 ReservationStatus @default(REQUESTED)
+  status                 ReservationStatus @default(PAYMENT_PENDING)
   // 입금 기한. 지나면 EXPIRED로 바뀌고 좌석이 풀린다.
   expiresAt              DateTime
   // 운영진이 취소했을 때 사유. 관객이 직접 취소하면 빈 값이다.
@@ -185,7 +182,7 @@ model CheckIn {
 model Refund {
   id            String       @id @default(cuid())
   reservationId String       @unique
-  status        RefundStatus @default(REQUESTED)
+  status        RefundStatus @default(PENDING)
   createdAt     DateTime     @default(now())
 
   reservation Reservation @relation(fields: [reservationId], references: [id])
@@ -200,8 +197,6 @@ model AuditLog {
   beforeJson  Json?
   afterJson   Json?
   createdAt   DateTime @default(now())
-  ipAddress   String?
-  userAgent   String?
 
   actorUser User? @relation("AuditUser", fields: [actorUserId], references: [id])
 }

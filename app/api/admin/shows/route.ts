@@ -1,25 +1,17 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { RoleType } from "@prisma/client";
+import { createShow, listShows, showInput } from "@/lib/admin-shows";
 import { requireRoleAtLeast } from "@/lib/auth-helpers";
-import { errorResponse } from "@/lib/http";
-import { createShow, listShows, parseShowInput } from "@/lib/admin-shows";
+import { readBody, route } from "@/lib/http";
 
-export async function GET() {
-  try {
-    await requireRoleAtLeast(RoleType.ADMIN);
-    return NextResponse.json({ shows: await listShows() });
-  } catch (error) {
-    return errorResponse(error);
-  }
-}
+export const GET = route(async () => {
+  await requireRoleAtLeast(RoleType.ADMIN);
+  return NextResponse.json({ shows: await listShows() });
+});
 
-export async function POST(req: Request) {
-  try {
-    const actor = await requireRoleAtLeast(RoleType.ADMIN);
-    const id = await createShow(parseShowInput(await req.json()), actor.user.id);
-    return NextResponse.json({ id });
-  } catch (error) {
-    return errorResponse(error);
-  }
-}
+export const POST = route(async (req) => {
+  const actor = await requireRoleAtLeast(RoleType.ADMIN);
+  const id = await createShow(await readBody(req, showInput), actor.user.id);
+  return NextResponse.json({ id });
+});

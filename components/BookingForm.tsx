@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ApiError, apiFetch, getToken } from "@/lib/api-client";
+import { ApiError, apiFetch, errorMessage, getToken } from "@/lib/api-client";
 import { formatSessionDate, won } from "@/lib/format";
 import { salesState, untilText } from "@/lib/sales";
-import { reservationStatus } from "@/lib/status";
+import { isClosedStatus, reservationStatus } from "@/lib/status";
 import { KakaoIcon } from "./icons";
 import Poster from "./show/Poster";
 import { useSalesClock } from "./useSalesClock";
@@ -26,8 +26,6 @@ type ShowProps = {
 
 type SessionProps = { id: string; title: string; dateText: string; startsAt: string; remaining: number; total: number };
 
-// 이미 예매가 있으면 다시 예매할 수 없는 상태(취소·환불·만료는 다시 예매할 수 있다)
-const ACTIVE_BOOKING = ["REQUESTED", "PAYMENT_PENDING", "CONFIRMED", "REFUND_REQUESTED", "REFUND_PENDING"];
 const OTHER = "__other";
 
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
@@ -71,7 +69,7 @@ export default function BookingForm({
   const [message, setMessage] = useState("");
 
   const { now } = useSalesClock(show.salesOpenAt);
-  const state = salesState({ salesOpenAt: show.salesOpenAt, sessions: sessions.map((s) => ({ date: s.startsAt, remaining: s.remaining })) }, now);
+  const state = salesState(show.salesOpenAt, sessions, now);
 
   useEffect(() => {
     const token = !!getToken();
@@ -80,7 +78,8 @@ export default function BookingForm({
     // 이미 예매했으면 폼을 다 채운 뒤에야 알게 되지 않도록 먼저 알려 준다.
     apiFetch<{ booking: { status: string } | null }>("/my/ticket-dashboard")
       .then((data) => {
-        if (data.booking && ACTIVE_BOOKING.includes(data.booking.status)) setExisting(data.booking);
+        // 취소·환불·만료된 예매만 있으면 다시 예매할 수 있다.
+        if (data.booking && !isClosedStatus(data.booking.status)) setExisting(data.booking);
       })
       .catch((error: unknown) => {
         if (error instanceof ApiError && error.status === 401) setLoggedIn(false);
@@ -117,12 +116,12 @@ export default function BookingForm({
     try {
       await apiFetch("/bookings", {
         method: "POST",
-        bodyJson: { eventId: sessionId, quantity: 1, preferredPerformerName: performer, depositorName: depositor.trim() },
+        bodyJson: { sessionId, quantity: 1, preferredPerformerName: performer, depositorName: depositor.trim() },
       });
       window.location.href = "/myticket?booked=1";
     } catch (error: unknown) {
       if (error instanceof ApiError && error.status === 401) setLoggedIn(false);
-      setMessage(error instanceof Error ? error.message : "예매하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+      setMessage(errorMessage(error, "예매하지 못했어요. 잠시 뒤 다시 시도해 주세요."));
       setSubmitting(false);
     }
   };
@@ -138,7 +137,7 @@ export default function BookingForm({
           : "예매하기";
 
   return (
-    <main className="page-enter pb-16">
+    <main className="pb-16">
       <div className="page pt-6 lg:pt-10">
         <h1 className="text-h1 font-bold">예매하기</h1>
 

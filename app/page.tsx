@@ -8,6 +8,7 @@ import { getCurrentShow, getPastShows, getSessionAvailability } from "@/lib/show
 export const viewport: Viewport = { themeColor: "#120809" };
 
 const ORDINAL = ["첫", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉", "열"];
+const COUNT = ["한", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉", "열"];
 
 type Poster = { id: string; title: string; posterUrl: string | null; year: string };
 
@@ -59,6 +60,9 @@ export default async function LandingPage() {
   const count = all.length;
   const firstYear = all.length ? all.map(yearOf).sort()[0] : "";
   const ordinal = count >= 1 && count <= ORDINAL.length ? `${ORDINAL[count - 1]} 번째` : `${count}번째`;
+  const times = count >= 1 && count <= COUNT.length ? `${COUNT[count - 1]} 번` : `${count}번`;
+  // 판매 중인 공연이 있으면 그 공연이 몇 번째 무대인지, 없으면 지금까지 몇 번 올렸는지 말한다.
+  const lineage = current ? `${firstYear}년부터 이어 온 ${ordinal} 무대` : `${firstYear}년부터 ${times}의 무대를 올렸어요`;
   const when = current ? [current.dateLabel, current.timeLabel].filter(Boolean).join("  ") : "";
 
   return (
@@ -89,7 +93,7 @@ export default async function LandingPage() {
         <div className="lg:order-1">
           {count > 0 && (
             <p className="anim-rise text-ui text-white/60 [animation-delay:480ms]">
-              {firstYear}년부터 이어 온 {ordinal} 무대
+              {lineage}
             </p>
           )}
           <h1 className="anim-rise mt-2 break-keep font-display text-[clamp(54px,15vw,100px)] leading-[0.98] tracking-[-0.02em] [animation-delay:540ms]">

@@ -18,8 +18,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# OS/IDE
+# OS/IDE, Claude Code 작업 공간
 .DS_Store
+.claude/
 Thumbs.db
 .vscode/*
 !.vscode/extensions.json
@@ -30,5 +31,6 @@ Thumbs.db
 # Tests/Coverage
 coverage/
 
-# TypeScript incremental cache
+# TypeScript incremental cache, Next가 빌드할 때 만드는 타입 파일
 *.tsbuildinfo
+next-env.d.ts

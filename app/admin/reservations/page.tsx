@@ -2,23 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import StatusBadge from "@/components/StatusBadge";
-import { apiFetch, readAdminCache, writeAdminCache } from "@/lib/api-client";
+import { apiFetch, errorMessage, readAdminCache, writeAdminCache } from "@/lib/api-client";
 import { bookingNumber, formatDateTime } from "@/lib/format";
 import { reservationStatus } from "@/lib/status";
 
 type ReservationItem = {
   id: string;
   status: string;
-  qty: number;
   preferredPerformerName: string;
   depositorName: string;
   cancelReason: string;
   expiresAt: string;
   createdAt: string;
-  userId: string;
-  userName: string;
-  userEmail?: string | null;
-  event?: { title?: string };
+  kakaoName: string;
+  showTitle: string;
 };
 
 type ReservationListResponse = { reservations: ReservationItem[]; nextCursor: string | null };
@@ -27,9 +24,9 @@ const PAGE_LIMIT = 80;
 
 const FILTERS = [
   { id: "all", label: "전체", statuses: null },
-  { id: "pending", label: "입금 대기", statuses: ["REQUESTED", "PAYMENT_PENDING"] },
+  { id: "pending", label: "입금 대기", statuses: ["PAYMENT_PENDING"] },
   { id: "confirmed", label: "예매 완료", statuses: ["CONFIRMED"] },
-  { id: "refund", label: "환불", statuses: ["REFUND_REQUESTED", "REFUND_PENDING", "REFUNDED"] },
+  { id: "refund", label: "환불", statuses: ["REFUND_PENDING", "REFUNDED"] },
   { id: "closed", label: "취소·만료", statuses: ["CANCELLED", "EXPIRED"] },
 ] as const;
 
@@ -64,7 +61,7 @@ export default function AdminReservationsPage() {
       });
       setNextCursor(incomingCursor);
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "예매자 목록을 불러오지 못했어요.");
+      setMessage(errorMessage(error, "예매자 목록을 불러오지 못했어요."));
     } finally {
       if (isLoadMore) setLoadingMore(false);
       else setLoading(false);
@@ -84,7 +81,7 @@ export default function AdminReservationsPage() {
 
   // 입금 확인·운영진 취소·만료 예매 되살리기. 처리한 뒤 목록을 새로 받는다.
   const act = async (r: ReservationItem, kind: "confirm" | "cancel") => {
-    const who = r.depositorName || r.userName;
+    const who = r.depositorName || r.kakaoName;
     let body: Record<string, unknown> = {};
     if (kind === "cancel") {
       const reason = window.prompt(`${who}님 예매를 취소할까요? 취소 사유를 적어 주세요. 관객의 마이 티켓에 보여요.`, "입금 기한 안에 입금이 확인되지 않았어요.");
@@ -98,14 +95,14 @@ export default function AdminReservationsPage() {
       setMessage(kind === "confirm" ? `${who}님 입금을 확인했어요. QR 티켓이 발급됐어요.` : `${who}님 예매를 취소했어요.`);
       await load();
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "처리하지 못했어요.");
+      setMessage(errorMessage(error, "처리하지 못했어요."));
     } finally {
       setBusy(null);
     }
   };
 
   const actions = (r: ReservationItem) =>
-    r.status === "PAYMENT_PENDING" || r.status === "REQUESTED" ? (
+    r.status === "PAYMENT_PENDING" ? (
       <span className="flex justify-end gap-1">
         <button type="button" disabled={busy !== null} onClick={() => void act(r, "confirm")} className="btn-primary btn-sm">
           입금 확인
@@ -136,7 +133,7 @@ export default function AdminReservationsPage() {
     return items.filter((r) => {
       if (statuses && !statuses.includes(r.status)) return false;
       if (!q) return true;
-      return [r.depositorName, r.userName, r.userEmail || "", r.preferredPerformerName, bookingNumber(r.id), r.event?.title || ""]
+      return [r.depositorName, r.kakaoName, r.preferredPerformerName, bookingNumber(r.id), r.showTitle]
         .join(" ")
         .toLowerCase()
         .includes(q);
@@ -204,10 +201,10 @@ export default function AdminReservationsPage() {
                 return (
                   <tr key={r.id}>
                     <td className="px-3 py-3 font-semibold tabular-nums tracking-wide">{bookingNumber(r.id)}</td>
-                    <td className="px-3 py-3 text-ink-2">{r.event?.title || "-"}</td>
+                    <td className="px-3 py-3 text-ink-2">{r.showTitle}</td>
                     <td className="px-3 py-3">
-                      {r.depositorName || r.userName}
-                      <span className="block text-cap text-ink-3">카카오 {r.userName}</span>
+                      {r.depositorName || r.kakaoName}
+                      <span className="block text-cap text-ink-3">카카오 {r.kakaoName}</span>
                     </td>
                     <td className="px-3 py-3 text-ink-2">{r.preferredPerformerName}</td>
                     <td className="px-3 py-3">
@@ -229,23 +226,19 @@ export default function AdminReservationsPage() {
               return (
                 <li key={r.id} className="py-3.5">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-[15px] font-semibold">{r.depositorName || r.userName}</p>
+                    <p className="text-[15px] font-semibold">{r.depositorName || r.kakaoName}</p>
                     <StatusBadge label={s.label} tone={s.tone} />
                   </div>
                   <p className="mt-1 text-meta text-ink-3">
-                    {r.event?.title && (
-                      <>
-                        {r.event.title}
-                        <span className="mx-1.5 text-line-strong">|</span>
-                      </>
-                    )}
+                    {r.showTitle}
+                    <span className="mx-1.5 text-line-strong">|</span>
                     관심 공연자 {r.preferredPerformerName}
                     <span className="mx-1.5 text-line-strong">|</span>
                     {bookingNumber(r.id)}
                   </p>
                   <p className="text-meta text-ink-3">
                     {formatDateTime(r.createdAt)} 예매
-                    {r.depositorName && `, 카카오 ${r.userName}`}
+                    {r.depositorName && `, 카카오 ${r.kakaoName}`}
                   </p>
                   {r.cancelReason && <p className="text-meta text-ink-3">취소 사유: {r.cancelReason}</p>}
                   {actions(r) && <div className="mt-2">{actions(r)}</div>}

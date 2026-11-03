@@ -13,7 +13,7 @@ export default function SalesStatus({
   sessions: { startsAt: string; remaining: number }[];
 }) {
   const { now } = useSalesClock(salesOpenAt);
-  const state = salesState({ salesOpenAt, sessions: sessions.map((s) => ({ date: s.startsAt, remaining: s.remaining })) }, now);
+  const state = salesState(salesOpenAt, sessions, now);
   const remaining = sessions.reduce((sum, s) => sum + s.remaining, 0);
 
   const text =

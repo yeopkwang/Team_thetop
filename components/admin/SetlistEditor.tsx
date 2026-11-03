@@ -2,50 +2,12 @@
 
 import type { ClipboardEvent } from "react";
 import { parseCredits } from "@/lib/credits";
-import { setlistFromText, splitNames, type SetlistSection } from "@/lib/setlist";
+import { setlistFromText } from "@/lib/setlist";
+import { applyPaste, cloneSetlist, emptySong, readCell, setlistColumns, toEditSetlist, writeCell, type EditSection } from "@/lib/setlist-edit";
 import { ChevronRightIcon, CloseIcon } from "../icons";
 
-// 편집하는 동안에는 칸에 적은 글을 그대로 들고 있다("홍길동, " 처럼 쉼표까지 쳐 둔 상태도 지켜야 해서).
-export type EditSong = { title: string; artist: string; cells: Record<string, string> };
-export type EditSection = { name: string; songs: EditSong[] };
-
-const DEFAULT_ROLES = ["보컬", "기타", "베이스", "드럼", "키보드"];
-const TITLE_HEADER = /^(곡명|곡|제목|노래)$/;
-const ARTIST_HEADER = /^(아티스트|가수|원곡|원곡자)$/;
-const NUMBER_HEADER = /^(번호|순서|no\.?|#)$/i;
-
-const emptySong = (): EditSong => ({ title: "", artist: "", cells: {} });
-
-export function toEditSetlist(sections: SetlistSection[]): EditSection[] {
-  return sections.map((s) => ({
-    name: s.name,
-    songs: s.songs.map((song) => ({
-      title: song.title,
-      artist: song.artist,
-      cells: Object.fromEntries(song.lineup.map((row) => [row.role, row.names.join(", ")])),
-    })),
-  }));
-}
-
-// 표의 열(파트): 크레딧에 적은 파트 순서대로, 크레딧이 비어 있으면 밴드 기본 파트. 칸에 이미 적힌 다른 파트도 지우지 않고 보여 준다.
-export function setlistColumns(credits: string, sections: EditSection[]) {
-  const fromCredits = parseCredits(credits)
-    .map((row) => row.role)
-    .filter(Boolean);
-  const used = sections.flatMap((s) => s.songs.flatMap((song) => Object.keys(song.cells).filter((role) => song.cells[role].trim())));
-  return Array.from(new Set([...(fromCredits.length ? fromCredits : DEFAULT_ROLES), ...used]));
-}
-
-export function fromEditSetlist(sections: EditSection[], columns: string[]): SetlistSection[] {
-  return sections.map((s) => ({
-    name: s.name.trim(),
-    songs: s.songs.map((song) => ({
-      title: song.title.trim(),
-      artist: song.artist.trim(),
-      lineup: columns.map((role) => ({ role, names: splitNames(song.cells[role] || "") })).filter((row) => row.names.length > 0),
-    })),
-  }));
-}
+export type { EditSection } from "@/lib/setlist-edit";
+export { fromEditSetlist, setlistColumns, toEditSetlist } from "@/lib/setlist-edit";
 
 const cell =
   "h-9 w-full rounded border border-transparent bg-transparent px-2 text-meta text-ink placeholder:text-ink-4 hover:border-line focus:border-brand-600 focus:bg-white focus:outline-none";
@@ -71,45 +33,16 @@ export default function SetlistEditor({
   const fromTextCount = fromText.reduce((sum, s) => sum + s.songs.length, 0);
 
   const update = (change: (draft: EditSection[]) => void) => {
-    const draft: EditSection[] = value.map((s) => ({ ...s, songs: s.songs.map((song) => ({ ...song, cells: { ...song.cells } })) }));
+    const draft = cloneSetlist(value);
     change(draft);
     onChange(draft);
   };
 
-  const write = (song: EditSong, key: string, text: string) => {
-    if (key === "title") song.title = text;
-    else if (key === "artist") song.artist = text;
-    else song.cells[key] = text;
-  };
-  const read = (song: EditSong, key: string) => (key === "title" ? song.title : key === "artist" ? song.artist : song.cells[key] || "");
-
   const paste = (si: number, gi: number, ki: number, event: ClipboardEvent<HTMLInputElement>) => {
-    const text = event.clipboardData.getData("text/plain");
-    if (!/[\t\n]/.test(text.trim())) return; // 한 칸짜리는 그냥 붙여 넣는다
+    const next = applyPaste(value, si, gi, keys, ki, event.clipboardData.getData("text/plain"));
+    if (!next) return; // 한 칸짜리는 그냥 붙여 넣는다
     event.preventDefault();
-    let rows = text
-      .replace(/\r/g, "")
-      .split("\n")
-      .map((line) => line.split("\t").map((c) => c.trim()))
-      .filter((row) => row.some(Boolean));
-    if (rows.length === 0) return;
-
-    // 첫 줄이 '곡명 | 아티스트 | 보컬 ...' 같은 제목 줄이면 그 이름대로 열을 맞춘다.
-    let target: (string | null)[];
-    if (TITLE_HEADER.test(rows[0][0]) || (NUMBER_HEADER.test(rows[0][0]) && TITLE_HEADER.test(rows[0][1] || ""))) {
-      target = rows[0].map((h) => (TITLE_HEADER.test(h) ? "title" : ARTIST_HEADER.test(h) ? "artist" : NUMBER_HEADER.test(h) || !h ? null : h));
-      rows = rows.slice(1);
-    } else {
-      // 곡명 칸에 붙였는데 맨 앞 열이 전부 숫자면 순번 열로 보고 버린다.
-      if (keys[ki] === "title" && rows.every((row) => /^\d+\.?$/.test(row[0]) && row.length > 1)) rows = rows.map((row) => row.slice(1));
-      target = keys.slice(ki);
-    }
-
-    update((draft) => {
-      const songs = draft[si].songs;
-      while (songs.length < gi + rows.length) songs.push(emptySong());
-      rows.forEach((row, r) => row.forEach((value, c) => target[c] && write(songs[gi + r], target[c] as string, value)));
-    });
+    onChange(next);
   };
 
   if (value.length === 0) {
@@ -190,8 +123,8 @@ export default function SetlistEditor({
                     {keys.map((key, ki) => (
                       <td key={key} className="px-0.5 py-0.5">
                         <input
-                          value={read(song, key)}
-                          onChange={(e) => update((d) => write(d[si].songs[gi], key, e.target.value))}
+                          value={readCell(song, key)}
+                          onChange={(e) => update((d) => writeCell(d[si].songs[gi], key, e.target.value))}
                           onPaste={(e) => paste(si, gi, ki, e)}
                           list={ki >= 2 ? `setlist-role-${ki - 2}` : undefined}
                           placeholder={key === "title" ? "곡명" : key === "artist" ? "아티스트" : ""}

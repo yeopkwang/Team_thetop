@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import StatusBadge from "@/components/StatusBadge";
-import { apiFetch, readAdminCache, writeAdminCache } from "@/lib/api-client";
+import { apiFetch, errorMessage, readAdminCache, writeAdminCache } from "@/lib/api-client";
 import { matchDeposits } from "@/lib/deposit-match";
 import { bookingNumber, formatDateTime, won } from "@/lib/format";
 
@@ -14,8 +14,8 @@ type Pending = {
   depositorName: string;
   preferredPerformerName: string;
   amount: number;
-  user?: { name?: string | null; email?: string | null };
-  event?: { title?: string };
+  kakaoName: string | null;
+  showTitle: string;
 };
 
 type BatchResult = { results: { id: string; ok: boolean; error?: string }[] };
@@ -44,7 +44,7 @@ export default function PendingDeposits() {
       setItems(bookings);
       writeAdminCache("pending", bookings);
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "입금 대기 목록을 불러오지 못했어요.");
+      setMessage(errorMessage(error, "입금 대기 목록을 불러오지 못했어요."));
     } finally {
       setLoading(false);
     }
@@ -66,7 +66,7 @@ export default function PendingDeposits() {
     new Set(lines.flatMap((l) => (l.kind === "match" || l.kind === "amount" ? [l.booking.id] : [])))
   ).filter(isChecked);
 
-  const nameOf = (b: Pending) => b.depositorName || b.user?.name || b.user?.email || "이름 없음";
+  const nameOf = (b: Pending) => b.depositorName || b.kakaoName || "이름 없음";
 
   const run = async (key: string, task: () => Promise<string>) => {
     setBusy(key);
@@ -75,7 +75,7 @@ export default function PendingDeposits() {
       setMessage(await task());
       await load();
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "처리하지 못했어요.");
+      setMessage(errorMessage(error, "처리하지 못했어요."));
     } finally {
       setBusy(null);
     }
@@ -114,7 +114,7 @@ export default function PendingDeposits() {
   const visible = items.filter(
     (b) =>
       !q ||
-      [b.depositorName, b.user?.name || "", b.preferredPerformerName, bookingNumber(b.id)].join("").toLowerCase().replace(/\s+/g, "").includes(q)
+      [b.depositorName, b.kakaoName || "", b.preferredPerformerName, bookingNumber(b.id)].join("").toLowerCase().replace(/\s+/g, "").includes(q)
   );
   const pending = visible.filter((b) => b.status !== "EXPIRED");
   const expired = visible.filter((b) => b.status === "EXPIRED");
@@ -125,7 +125,7 @@ export default function PendingDeposits() {
   const toggle = (id: string) => setOverrides((prev) => ({ ...prev, [id]: !isChecked(id) }));
 
   const row = (b: Pending, late: boolean) => {
-    const kakao = b.user?.name || "";
+    const kakao = b.kakaoName || "";
     return (
       <li key={b.id} className="py-4">
         <div className="flex items-start justify-between gap-4">
@@ -144,7 +144,7 @@ export default function PendingDeposits() {
               {bookingNumber(b.id)}
             </p>
             <p className={`text-meta ${late ? "text-brand-600" : "text-ink-3"}`}>
-              {b.event?.title ? `${b.event.title}, ` : ""}
+              {b.showTitle}, 
               {late ? `${formatDateTime(b.expiresAt)}에 기한 지남` : `${formatDateTime(b.expiresAt)}까지 입금`}
             </p>
           </div>

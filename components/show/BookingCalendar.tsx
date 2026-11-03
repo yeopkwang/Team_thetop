@@ -45,7 +45,7 @@ export default function BookingCalendar({
   salesOpenAt: string | null;
 }) {
   const { now } = useSalesClock(salesOpenAt);
-  const state = salesState({ salesOpenAt, sessions: sessions.map((s) => ({ date: s.startsAt, remaining: s.remaining })) }, now);
+  const state = salesState(salesOpenAt, sessions, now);
   const months = useMemo(() => Array.from(new Set(sessions.map((s) => monthKey(s.dayKey)))).sort(), [sessions]);
   const firstOpen = sessions.find((s) => s.remaining > 0) || sessions[0];
 

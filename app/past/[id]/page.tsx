@@ -43,7 +43,7 @@ export default async function PastShowPage({ params }: { params: { id: string } 
   ];
 
   return (
-    <main className="page-enter pb-16">
+    <main className="pb-16">
       <MobilePosterHero src={show.posterUrl} title={show.title} />
 
       <div className="page lg:pt-6">

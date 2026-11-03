@@ -2,17 +2,11 @@
 
 import { useEffect, useState } from "react";
 import StatusBadge from "@/components/StatusBadge";
-import { apiFetch, readAdminCache, writeAdminCache } from "@/lib/api-client";
+import { apiFetch, errorMessage, readAdminCache, writeAdminCache } from "@/lib/api-client";
 import { bookingNumber, formatDateTime } from "@/lib/format";
 import { refundStatus } from "@/lib/status";
 
-type RefundItem = {
-  id: string;
-  reservationId: string;
-  status: string;
-  createdAt: string;
-  reservation?: { userId: string; user?: { name?: string | null; email?: string | null } };
-};
+type RefundItem = { id: string; status: string; createdAt: string; bookingId: string; name: string; showTitle: string };
 
 export default function AdminRefundsPage() {
   const [items, setItems] = useState<RefundItem[]>([]);
@@ -27,7 +21,7 @@ export default function AdminRefundsPage() {
       setItems(refunds);
       writeAdminCache("refunds", refunds);
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "환불 요청 목록을 불러오지 못했어요.");
+      setMessage(errorMessage(error, "환불 요청 목록을 불러오지 못했어요."));
     } finally {
       setLoading(false);
     }
@@ -43,17 +37,21 @@ export default function AdminRefundsPage() {
     void load();
   }, []);
 
-  const complete = async (item: RefundItem) => {
-    const name = item.reservation?.user?.name || "예매자";
-    if (!window.confirm(`${name}님께 송금을 마쳤나요? 환불 완료로 바꾸면 되돌릴 수 없어요.`)) return;
+  // 환불 완료(송금한 뒤) 또는 요청 되돌리기(관객이 잘못 눌렀을 때). 처리한 뒤 목록을 새로 받는다.
+  const act = async (item: RefundItem, kind: "refund" | "revert") => {
+    const ask =
+      kind === "refund"
+        ? `${item.name}님께 송금을 마쳤나요? 환불 완료로 바꾸면 되돌릴 수 없어요.`
+        : `${item.name}님의 환불 요청을 되돌릴까요? 예매 완료로 돌아가고 원래 QR 티켓으로 입장할 수 있어요.`;
+    if (!window.confirm(ask)) return;
     setBusy(item.id);
     setMessage("");
     try {
-      await apiFetch(`/admin/refunds/${item.id}/refund`, { method: "POST", bodyJson: {} });
-      setMessage(`${name}님 환불을 완료했어요.`);
+      await apiFetch(`/admin/refunds/${item.id}/${kind}`, { method: "POST", bodyJson: {} });
+      setMessage(kind === "refund" ? `${item.name}님 환불을 완료했어요.` : `${item.name}님 예매를 예매 완료로 되돌렸어요.`);
       await load();
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "환불 완료로 바꾸지 못했어요.");
+      setMessage(errorMessage(error, "처리하지 못했어요."));
     } finally {
       setBusy(null);
     }
@@ -83,24 +81,26 @@ export default function AdminRefundsPage() {
             <li key={r.id} className="flex items-center justify-between gap-4 py-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-[15px] font-semibold">{r.reservation?.user?.name || "이름 없음"}</p>
+                  <p className="text-[15px] font-semibold">{r.name}</p>
                   <StatusBadge label={s.label} tone={s.tone} />
                 </div>
                 <p className="mt-0.5 text-meta text-ink-3">
-                  예매번호 {bookingNumber(r.reservationId)}
+                  {r.showTitle}
+                  <span className="mx-1.5 text-line-strong">|</span>
+                  예매번호 {bookingNumber(r.bookingId)}
                   <span className="mx-1.5 text-line-strong">|</span>
                   {formatDateTime(r.createdAt)} 요청
                 </p>
               </div>
               {r.status !== "REFUNDED" && (
-                <button
-                  type="button"
-                  disabled={busy === r.id}
-                  onClick={() => void complete(r)}
-                  className="btn-primary btn-sm shrink-0"
-                >
-                  {busy === r.id ? "처리 중" : "환불 완료"}
-                </button>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <button type="button" disabled={busy !== null} onClick={() => void act(r, "refund")} className="btn-primary btn-sm">
+                    {busy === r.id ? "처리 중" : "환불 완료"}
+                  </button>
+                  <button type="button" disabled={busy !== null} onClick={() => void act(r, "revert")} className="btn-ghost text-cap text-ink-3">
+                    요청 되돌리기
+                  </button>
+                </div>
               )}
             </li>
           );

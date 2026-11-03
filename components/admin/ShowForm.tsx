@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, errorMessage } from "@/lib/api-client";
 import { performerNames } from "@/lib/credits";
+import { fromKstInput, toKstInput } from "@/lib/format";
 import { normalizeSetlist } from "@/lib/setlist";
 import { SHOW_STATUS, type ShowStatusKey } from "@/lib/status";
 import SetlistEditor, { fromEditSetlist, setlistColumns, toEditSetlist, type EditSection } from "./SetlistEditor";
@@ -96,13 +97,6 @@ const CARRY_OVER: (keyof FormState)[] = [
   "totalCapacity",
 ];
 
-// <input type="datetime-local">은 시간대 없는 값을 쓴다. 브라우저(한국 시간) 기준으로 바꾼다.
-function toLocalInput(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 function toForm(show: ShowDetail): FormState {
   const { session, reservedQty: _r, posterUrl, salesOpenAt, setlist, id: _id, ...fields } = show;
   return {
@@ -110,8 +104,8 @@ function toForm(show: ShowDetail): FormState {
     ...fields,
     setlist: toEditSetlist(normalizeSetlist(setlist)),
     posterUrl: posterUrl || "",
-    salesOpenAt: salesOpenAt ? toLocalInput(salesOpenAt) : "",
-    sessionDate: session ? toLocalInput(session.date) : "",
+    salesOpenAt: salesOpenAt ? toKstInput(salesOpenAt) : "",
+    sessionDate: session ? toKstInput(session.date) : "",
     totalCapacity: session?.totalCapacity ?? EMPTY.totalCapacity,
   };
 }
@@ -168,7 +162,7 @@ export default function ShowForm({ showId }: { showId?: string }) {
           setCarriedFrom(show.title);
         }
       } catch (error: unknown) {
-        setMessage(error instanceof Error ? error.message : "공연 정보를 불러오지 못했어요.");
+        setMessage(errorMessage(error, "공연 정보를 불러오지 못했어요."));
       } finally {
         setLoading(false);
       }
@@ -195,8 +189,8 @@ export default function ShowForm({ showId }: { showId?: string }) {
       const body = {
         ...fields,
         setlist: fromEditSetlist(setlist, setlistColumns(form.credits, setlist)),
-        salesOpenAt: salesOpenAt ? new Date(salesOpenAt).toISOString() : null,
-        session: { date: new Date(sessionDate).toISOString(), totalCapacity },
+        salesOpenAt: salesOpenAt ? fromKstInput(salesOpenAt).toISOString() : null,
+        session: { date: fromKstInput(sessionDate).toISOString(), totalCapacity },
       };
       if (showId) {
         const { show } = await apiFetch<{ show: ShowDetail }>(`/admin/shows/${showId}`, { method: "PUT", bodyJson: body });
@@ -208,7 +202,7 @@ export default function ShowForm({ showId }: { showId?: string }) {
         router.replace(`/admin/shows/${id}`);
       }
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "저장하지 못했어요.");
+      setMessage(errorMessage(error, "저장하지 못했어요."));
     } finally {
       setSaving(false);
     }
@@ -225,7 +219,7 @@ export default function ShowForm({ showId }: { showId?: string }) {
       set("posterUrl", url);
       setMessage("포스터를 올렸어요. 저장하면 반영돼요.");
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "포스터를 올리지 못했어요.");
+      setMessage(errorMessage(error, "포스터를 올리지 못했어요."));
     } finally {
       setUploading(false);
     }
@@ -237,7 +231,7 @@ export default function ShowForm({ showId }: { showId?: string }) {
       await apiFetch(`/admin/shows/${showId}`, { method: "DELETE" });
       router.replace("/admin/shows");
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "지우지 못했어요.");
+      setMessage(errorMessage(error, "지우지 못했어요."));
     }
   };
 

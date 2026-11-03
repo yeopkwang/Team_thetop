@@ -14,7 +14,7 @@ export default function MobileBookingBar({
   sessions: { startsAt: string; remaining: number }[];
 }) {
   const { now } = useSalesClock(salesOpenAt);
-  const state = salesState({ salesOpenAt, sessions: sessions.map((s) => ({ date: s.startsAt, remaining: s.remaining })) }, now);
+  const state = salesState(salesOpenAt, sessions, now);
 
   return (
     <div className="bottom-bar lg:hidden">

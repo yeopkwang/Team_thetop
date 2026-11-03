@@ -1,84 +1,18 @@
 export const dynamic = "force-dynamic";
-
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { RoleType } from "@prisma/client";
+import { listReservations } from "@/lib/admin-bookings";
 import { requireRoleAtLeast } from "@/lib/auth-helpers";
-import { errorResponse } from "@/lib/http";
-import { expireOverdue } from "@/lib/reservations";
+import { route } from "@/lib/http";
 
 const DEFAULT_LIMIT = 80;
 const MAX_LIMIT = 200;
 
-export async function GET(req: Request) {
-  try {
-    await requireRoleAtLeast(RoleType.STAFF);
-
-    const { searchParams } = new URL(req.url);
-    const rawLimit = Number(searchParams.get("limit") || DEFAULT_LIMIT);
-    const limit = Number.isFinite(rawLimit)
-      ? Math.min(MAX_LIMIT, Math.max(1, Math.trunc(rawLimit)))
-      : DEFAULT_LIMIT;
-    const cursor = searchParams.get("cursor") || undefined;
-    if (!cursor) await expireOverdue();
-
-    const reservations = await prisma.reservation.findMany({
-      take: limit + 1,
-      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      select: {
-        id: true,
-        status: true,
-        qty: true,
-        preferredPerformerName: true,
-        depositorName: true,
-        cancelReason: true,
-        expiresAt: true,
-        createdAt: true,
-        session: {
-          select: {
-            id: true,
-            show: { select: { title: true, venue: true, dateLabel: true, timeLabel: true } },
-          },
-        },
-        user: {
-          select: {
-            id: true,
-            name: true,
-            nickname: true,
-            email: true,
-          },
-        },
-      },
-    });
-
-    const hasNext = reservations.length > limit;
-    const rows = hasNext ? reservations.slice(0, limit) : reservations;
-
-    return NextResponse.json({
-      reservations: rows.map((r) => ({
-        id: r.id,
-        status: r.status,
-        qty: r.qty,
-        preferredPerformerName: r.preferredPerformerName,
-        depositorName: r.depositorName,
-        cancelReason: r.cancelReason,
-        expiresAt: r.expiresAt,
-        createdAt: r.createdAt,
-        userId: r.user.id,
-        userName: r.user.name || r.user.nickname || "사용자",
-        userEmail: r.user.email || null,
-        event: {
-          id: r.session.id,
-          title: r.session.show.title,
-          venue: r.session.show.venue,
-          date: r.session.show.dateLabel,
-          time: r.session.show.timeLabel,
-        },
-      })),
-      nextCursor: hasNext ? rows[rows.length - 1]?.id || null : null,
-    });
-  } catch (error) {
-    return errorResponse(error);
-  }
-}
+// 예매자 목록(최근 예매부터, cursor로 다음 페이지).
+export const GET = route(async (req) => {
+  await requireRoleAtLeast(RoleType.STAFF);
+  const { searchParams } = new URL(req.url);
+  const raw = Number(searchParams.get("limit") || DEFAULT_LIMIT);
+  const limit = Number.isFinite(raw) ? Math.min(MAX_LIMIT, Math.max(1, Math.trunc(raw))) : DEFAULT_LIMIT;
+  return NextResponse.json(await listReservations(limit, searchParams.get("cursor") || undefined));
+});

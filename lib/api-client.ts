@@ -37,8 +37,6 @@ export function getAuthProvider(): "kakao" | "admin" | null {
 export function clearAuthState(): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem("token");
-  window.localStorage.removeItem("latestTicket");
-  window.localStorage.removeItem("hasBooked");
   window.localStorage.removeItem(ADMIN_ROLE_KEY);
   window.localStorage.removeItem(AUTH_PROVIDER_KEY);
   clearAdminCache();
@@ -91,6 +89,11 @@ function clearAdminCache() {
   }
 }
 
+// 화면에 보여 줄 오류 문구. 서버가 준 문구가 있으면 그것을, 없으면 fallback을 쓴다.
+export function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 // 서버가 돌려준 오류. status로 로그인 필요(401) 같은 경우를 가려낸다.
 export class ApiError extends Error {
   status: number;
@@ -114,11 +117,13 @@ export async function apiFetch<T = unknown>(
     body = JSON.stringify(init.bodyJson);
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers,
-    body,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, { ...init, headers, body });
+  } catch {
+    // 오프라인이거나 서버에 닿지 못했을 때. 브라우저 영어 문구 대신 한국어로 알려 준다.
+    throw new ApiError(0, "인터넷 연결을 확인한 뒤 다시 시도해 주세요.");
+  }
 
   const text = await response.text();
   let parsed: unknown = null;
@@ -129,7 +134,7 @@ export async function apiFetch<T = unknown>(
   }
 
   if (!response.ok) {
-    const fallback = `HTTP ${response.status}`;
+    const fallback = response.status >= 500 ? "일시적인 문제로 처리하지 못했어요. 잠시 뒤 다시 시도해 주세요." : "요청을 처리하지 못했어요.";
     const apiMessage =
       typeof parsed === "object" && parsed && "error" in parsed
         ? String((parsed as { error?: string }).error || fallback)

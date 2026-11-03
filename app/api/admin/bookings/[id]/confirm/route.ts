@@ -1,23 +1,11 @@
 import { NextResponse } from "next/server";
 import { RoleType } from "@prisma/client";
-import { requireRoleAtLeast } from "@/lib/auth-helpers";
-import { errorResponse } from "@/lib/http";
 import { confirmBooking } from "@/lib/admin-bookings";
+import { requireRoleAtLeast } from "@/lib/auth-helpers";
+import { route } from "@/lib/http";
 
-export async function POST(_: Request, { params }: { params: { id: string } }) {
-  try {
-    const actor = await requireRoleAtLeast(RoleType.STAFF);
-    const result = await confirmBooking(params.id, actor.user.id);
-
-    return NextResponse.json({
-      booking: {
-        id: result.booking.id,
-        status: result.booking.status,
-        createdAt: result.booking.createdAt,
-      },
-      tickets: [{ id: result.ticket.id, ticketCode: result.ticket.qrToken }],
-    });
-  } catch (error) {
-    return errorResponse(error);
-  }
-}
+// 입금 확인(만료된 예매 되살리기 포함).
+export const POST = route<{ params: { id: string } }>(async (_req, { params }) => {
+  const actor = await requireRoleAtLeast(RoleType.STAFF);
+  return NextResponse.json({ booking: await confirmBooking(params.id, actor.user.id) });
+});

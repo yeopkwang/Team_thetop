@@ -2,11 +2,12 @@
 export type SalesState = "upcoming" | "open" | "soldout" | "closed";
 
 export function salesState(
-  { salesOpenAt, sessions }: { salesOpenAt: Date | string | null; sessions: { date: Date | string; remaining: number }[] },
+  salesOpenAt: Date | string | null,
+  sessions: { startsAt: Date | string; remaining: number }[],
   now = Date.now()
 ): SalesState {
   if (salesOpenAt && new Date(salesOpenAt).getTime() > now) return "upcoming";
-  const bookable = sessions.filter((s) => new Date(s.date).getTime() > now);
+  const bookable = sessions.filter((s) => new Date(s.startsAt).getTime() > now);
   if (bookable.length === 0) return "closed";
   if (bookable.every((s) => s.remaining === 0)) return "soldout";
   return "open";

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import StatusBadge from "@/components/StatusBadge";
 import { ChevronRightIcon } from "@/components/icons";
-import { apiFetch, readAdminCache, writeAdminCache } from "@/lib/api-client";
+import { apiFetch, errorMessage, readAdminCache, writeAdminCache } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
 import { SHOW_STATUS, type ShowStatusKey } from "@/lib/status";
 
@@ -36,7 +36,7 @@ export default function AdminShowsPage() {
         setShows(data.shows);
         writeAdminCache("shows", data.shows);
       })
-      .catch((error: unknown) => setMessage(error instanceof Error ? error.message : "공연 목록을 불러오지 못했어요."))
+      .catch((error: unknown) => setMessage(errorMessage(error, "공연 목록을 불러오지 못했어요.")))
       .finally(() => setLoading(false));
   }, []);
 

@@ -4,21 +4,19 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import EmptyState from "@/components/EmptyState";
-import { CheckIcon, CopyIcon } from "@/components/icons";
+import PaymentGuide from "@/components/ticket/PaymentGuide";
 import TicketStub from "@/components/ticket/TicketStub";
-import { ApiError, apiFetch, getToken } from "@/lib/api-client";
-import { formatSessionDate, won } from "@/lib/format";
+import { ApiError, apiFetch, errorMessage, getToken } from "@/lib/api-client";
 
 type Booking = {
   id: string;
   status: string;
   createdAt: string;
-  quantity: number;
   expiresAt: string;
   depositorName: string;
   cancelReason: string;
 };
-type Ticket = { id: string; ticketCode: string; checkedInAt?: string | null };
+type Ticket = { code: string; checkedInAt: string | null };
 type ShowSummary = {
   title: string;
   dateLabel: string;
@@ -30,7 +28,7 @@ type ShowSummary = {
   paymentHolder: string;
   refundContact: string;
 };
-type Dashboard = { booking: Booking | null; tickets: Ticket[]; show: ShowSummary | null };
+type Dashboard = { booking: Booking | null; ticket: Ticket | null; show: ShowSummary | null };
 
 type View = "loading" | "login" | "error" | "ready";
 
@@ -39,60 +37,6 @@ const CLOSED_MESSAGES: Record<string, string> = {
   REFUNDED: "환불이 끝났어요. 좌석이 남아 있으면 다시 예매할 수 있어요.",
   EXPIRED: "입금 기한이 지나 예매가 만료됐어요. 이미 입금했다면 공연 문의처로 알려 주세요. 좌석이 남아 있으면 다시 예매할 수도 있어요.",
 };
-
-function PaymentGuide({ show, booking }: { show: ShowSummary; booking: Booking }) {
-  const [copied, setCopied] = useState(false);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(show.paymentAccount.replace(/[^0-9]/g, "") || show.paymentAccount);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
-  };
-
-  return (
-    <section className="rounded-xl border border-wait-700/20 bg-wait-50 p-5">
-      <h2 className="text-[15px] font-bold text-wait-700">입금하면 예매가 완료돼요</h2>
-      <dl className="mt-3 space-y-2 text-ui">
-        <div className="flex items-center justify-between gap-3">
-          <dt className="text-ink-2">입금 계좌</dt>
-          <dd className="flex items-center gap-2 text-right font-semibold">
-            <span>
-              {show.paymentBank} {show.paymentAccount}
-            </span>
-            <button
-              type="button"
-              onClick={copy}
-              className="inline-flex h-8 items-center gap-1 rounded border border-line-strong bg-white px-2 text-cap font-semibold text-ink-2 hover:text-ink"
-            >
-              {copied ? <CheckIcon className="h-3.5 w-3.5" /> : <CopyIcon className="h-3.5 w-3.5" />}
-              {copied ? "복사됨" : "복사"}
-            </button>
-          </dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className="text-ink-2">예금주</dt>
-          <dd>{show.paymentHolder}</dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className="text-ink-2">입금자명</dt>
-          <dd className="font-semibold">{booking.depositorName || "관람객 본인 실명"}</dd>
-        </div>
-        <div className="flex justify-between gap-3">
-          <dt className="text-ink-2">입금 금액</dt>
-          <dd className="text-lead font-bold text-ink">{won(show.price)}</dd>
-        </div>
-      </dl>
-      <p className="mt-3 border-t border-wait-700/15 pt-3 text-meta text-ink-2">
-        <strong className="font-semibold text-wait-700">{formatSessionDate(booking.expiresAt)}</strong>까지 입금해 주세요. 기한이
-        지나면 예매가 저절로 만료돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.
-      </p>
-    </section>
-  );
-}
 
 export default function MyTicketPage() {
   const [view, setView] = useState<View>("loading");
@@ -115,7 +59,7 @@ export default function MyTicketPage() {
         setView("login");
         return;
       }
-      setMessage(error instanceof Error ? error.message : "티켓을 불러오지 못했어요.");
+      setMessage(errorMessage(error, "티켓을 불러오지 못했어요."));
       setView("error");
     }
   };
@@ -129,22 +73,22 @@ export default function MyTicketPage() {
     void load();
   }, []);
 
-  const ticket = data?.tickets[0] || null;
+  const ticket = data?.ticket || null;
 
   // QR은 브라우저에서 그린다. 외부 QR 서비스에 넘기면 입장 토큰이 남의 서버에 남는다.
   useEffect(() => {
-    if (!ticket?.ticketCode) {
+    if (!ticket?.code) {
       setQrImage("");
       return;
     }
     let cancelled = false;
-    QRCode.toDataURL(ticket.ticketCode, { width: 400, margin: 1 })
+    QRCode.toDataURL(ticket.code, { width: 400, margin: 1 })
       .then((url) => !cancelled && setQrImage(url))
       .catch(() => !cancelled && setMessage("QR 코드를 그리지 못했어요. 새로고침해 주세요."));
     return () => {
       cancelled = true;
     };
-  }, [ticket?.ticketCode]);
+  }, [ticket?.code]);
 
   const act = async (confirmText: string, path: string, body: Record<string, unknown> | undefined, done: string) => {
     if (!window.confirm(confirmText)) return;
@@ -155,7 +99,7 @@ export default function MyTicketPage() {
       setMessage(done);
       await load();
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "처리하지 못했어요.");
+      setMessage(errorMessage(error, "처리하지 못했어요."));
     } finally {
       setBusy(false);
     }
@@ -220,7 +164,7 @@ export default function MyTicketPage() {
         <TicketStub
           show={show}
           booking={booking}
-          ticketCode={ticket?.ticketCode || ""}
+          ticketCode={ticket?.code || ""}
           checkedInAt={ticket?.checkedInAt || null}
           qrImage={qrImage}
         >

@@ -12,8 +12,10 @@ export type DepositLine<C extends DepositCandidate> =
 
 const squash = (s: string) => s.replace(/\s+/g, "");
 
+// 줄에 있는 금액 후보. '잔액 107,000'처럼 통장 잔액은 입금액이 아니므로 빼고 본다.
 export function amountsIn(line: string) {
-  return (line.match(/\d{1,3}(?:,\d{3})+|\d+/g) || []).map((n) => Number(n.replace(/,/g, "")));
+  const withoutBalance = line.replace(/(잔액|잔고)\s*[:：]?\s*[\d,]+\s*원?/g, " ");
+  return (withoutBalance.match(/\d{1,3}(?:,\d{3})+|\d+/g) || []).map((n) => Number(n.replace(/,/g, "")));
 }
 
 export function matchDeposits<C extends DepositCandidate>(text: string, bookings: C[]): DepositLine<C>[] {

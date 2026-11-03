@@ -1,16 +1,34 @@
-import { Prisma, ShowStatus } from "@prisma/client";
+import { Prisma, ReservationStatus, ShowStatus } from "@prisma/client";
 import { z } from "zod";
-import { prisma } from "./prisma";
-import { HttpError } from "./http";
-import { SEAT_HOLDING_STATUSES, expireOverdue } from "./reservations";
-import { normalizeSetlist } from "./setlist";
 import { logAudit } from "./audit";
+import { HttpError } from "./http";
+import { prisma } from "./prisma";
+import { SEAT_HOLDING_STATUSES, expireOverdue, lockSession, paymentDeadline, seatsHeld } from "./reservations";
+import { normalizeSetlist } from "./setlist";
 
-const text = z.string().trim().max(10000).default("");
+const text = z.string({ invalid_type_error: "글자로 적어 주세요." }).trim().max(10000, "안내문은 10,000자 안으로 적어 주세요.").default("");
+const wholeNumber = (label: string, min: number, max: number) =>
+  z.coerce
+    .number({ invalid_type_error: `${label}은(는) 숫자로 적어 주세요.` })
+    .int(`${label}은(는) 정수로 적어 주세요.`)
+    .min(min, `${label}은(는) ${min.toLocaleString("ko-KR")} 이상이어야 해요.`)
+    .max(max, `${label}은(는) ${max.toLocaleString("ko-KR")} 이하로 적어 주세요.`);
+const isoDate = (message: string) => z.string({ invalid_type_error: message, required_error: message }).datetime({ message });
+
+// 포스터 주소: 이 사이트 안의 경로(/posters/…, /api/assets/…)나 https 주소만 받는다.
+const posterUrl = z
+  .string()
+  .trim()
+  .max(1000)
+  .nullish()
+  .transform((v) => v || null)
+  .refine((v) => v === null || (v.startsWith("/") && !v.startsWith("//")) || v.startsWith("https://"), {
+    message: "포스터 주소는 '이미지 올리기'로 받은 주소나 https://로 시작하는 주소여야 해요.",
+  });
 
 export const showInput = z.object({
-  title: z.string().trim().min(1, "공연 제목을 입력해 주세요.").max(200),
-  posterUrl: z.string().trim().max(1000).nullish().transform((v) => v || null),
+  title: z.string({ required_error: "공연명을 적어 주세요." }).trim().min(1, "공연명을 적어 주세요.").max(200, "공연명은 200자 안으로 적어 주세요."),
+  posterUrl,
   dateLabel: text,
   timeLabel: text,
   timeSubLabel: text,
@@ -20,7 +38,7 @@ export const showInput = z.object({
   contactTag: text,
   audienceInfo: text,
   notice: text,
-  price: z.coerce.number().int().min(0, "관람료는 0원 이상이어야 합니다."),
+  price: wholeNumber("관람료", 0, 1_000_000),
   paymentBank: text,
   paymentAccount: text,
   paymentHolder: text,
@@ -34,41 +52,22 @@ export const showInput = z.object({
     .optional()
     .transform((v) => normalizeSetlist(v) as unknown as Prisma.InputJsonValue),
   setlistPublic: z.boolean().default(false),
-  paymentHours: z.coerce
-    .number()
-    .int("입금 기한은 시간 단위로 적어 주세요.")
-    .min(0, "입금 기한은 0시간 이상이어야 합니다.")
-    .max(24 * 14, "입금 기한은 2주(336시간)까지 정할 수 있어요.")
-    .default(24),
-  salesOpenAt: z
-    .string()
-    .datetime({ message: "티켓 오픈 일시가 올바르지 않습니다." })
+  paymentHours: wholeNumber("입금 기한(시간)", 0, 24 * 14).default(24),
+  salesOpenAt: isoDate("티켓 오픈 일시가 올바르지 않아요.")
     .nullish()
     .transform((v) => (v ? new Date(v) : null)),
-  status: z.nativeEnum(ShowStatus),
-  session: z.object({
-    title: z.string().trim().min(1).max(100).default("1회차"),
-    date: z.string().datetime({ message: "공연 일시가 올바르지 않습니다." }),
-    totalCapacity: z.coerce.number().int().min(1, "정원은 1명 이상이어야 합니다."),
-  }),
+  status: z.nativeEnum(ShowStatus, { errorMap: () => ({ message: "공연 상태를 골라 주세요." }) }),
+  session: z.object(
+    {
+      title: z.string().trim().min(1).max(100).catch("1회차"),
+      date: isoDate("공연 일시를 적어 주세요."),
+      totalCapacity: wholeNumber("정원", 1, 100_000),
+    },
+    { required_error: "공연 일시와 정원을 적어 주세요." }
+  ),
 });
 
 export type ShowInput = z.infer<typeof showInput>;
-
-export function parseShowInput(body: unknown) {
-  const parsed = showInput.safeParse(body);
-  if (!parsed.success) throw new HttpError(400, parsed.error.issues[0]?.message || "입력값을 확인해 주세요.");
-  return parsed.data;
-}
-
-async function seatHolding(sessionIds: string[], db: Prisma.TransactionClient = prisma) {
-  if (sessionIds.length === 0) return 0;
-  const reserved = await db.reservation.aggregate({
-    where: { sessionId: { in: sessionIds }, status: { in: SEAT_HOLDING_STATUSES } },
-    _sum: { qty: true },
-  });
-  return reserved._sum.qty || 0;
-}
 
 // 공연 관리 목록: 최근 공연부터, 회차 날짜와 좌석을 잡은 예매 수를 함께.
 // 예매 수는 공연마다 따로 묻지 않고 한 번에 센다(DB 왕복 횟수가 곧 속도라서).
@@ -118,7 +117,15 @@ export async function loadShow(id: string) {
   if (!show) return null;
   const { sessions, ...fields } = show;
   const session = sessions[0] || null;
-  return { ...fields, session, reservedQty: await seatHolding(session ? [session.id] : []) };
+  return { ...fields, session, reservedQty: await seatsHeld(prisma, session ? [session.id] : []) };
+}
+
+// 공연을 만들거나 고치는 트랜잭션을 한 줄로 세운다. 두 관리자가 동시에 서로 다른 공연을 '판매 중'으로 저장해도
+// 앞 사람이 끝난 뒤에 뒷사람이 다른 판매 중 공연을 정리하므로 판매 중이 둘이 되지 않는다.
+const SHOW_WRITE_LOCK = 20270221;
+async function lockShowWrites(tx: Prisma.TransactionClient) {
+  // pg_advisory_xact_lock은 void를 돌려줘서 Prisma가 읽지 못한다. 글자로 바꿔 받는다.
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(${SHOW_WRITE_LOCK})::text AS locked`;
 }
 
 // 판매 중은 한 번에 하나: 다른 판매 중 공연은 지난 공연으로 옮긴다.
@@ -132,6 +139,7 @@ async function endOtherOnSale(tx: Prisma.TransactionClient, keepId: string | nul
 export async function createShow(input: ShowInput, actorUserId: string) {
   const { session, ...fields } = input;
   return prisma.$transaction(async (tx) => {
+    await lockShowWrites(tx);
     if (fields.status === ShowStatus.ON_SALE) await endOtherOnSale(tx, null);
     const created = await tx.show.create({
       data: {
@@ -155,18 +163,37 @@ export async function updateShow(id: string, input: ShowInput, actorUserId: stri
   };
 
   await prisma.$transaction(async (tx) => {
+    await lockShowWrites(tx);
     if (fields.status === ShowStatus.ON_SALE) await endOtherOnSale(tx, id);
     await tx.show.update({ where: { id }, data: fields });
 
     if (current.session) {
       // 예매 API와 같은 행을 잠그고 세야, 세는 사이에 들어온 예매까지 반영된다.
-      await tx.$queryRaw`SELECT id FROM "ShowSession" WHERE id = ${current.session.id} FOR UPDATE`;
+      await lockSession(tx, current.session.id);
       await expireOverdue({ sessionId: current.session.id }, tx);
-      const reservedQty = await seatHolding([current.session.id], tx);
+      const reservedQty = await seatsHeld(tx, [current.session.id]);
       if (sessionInput.totalCapacity < reservedQty) {
-        throw new HttpError(400, `이미 ${reservedQty}명이 예매해서 정원을 그보다 줄일 수 없습니다.`);
+        throw new HttpError(400, `이미 ${reservedQty}명이 예매해서 정원을 그보다 줄일 수 없어요.`);
       }
       await tx.showSession.update({ where: { id: current.session.id }, data: sessionData });
+
+      // 공연 일시나 입금 기한을 바꾸면 입금 대기 중인 예매의 기한도 다시 맞춘다.
+      // 관객에게 이미 안내한 기한보다 앞당기지는 않고, 공연 시작 시각은 넘기지 않는다.
+      const moved = sessionData.date.getTime() !== current.session.date.getTime();
+      if (moved || fields.paymentHours !== current.paymentHours) {
+        const pending = await tx.reservation.findMany({
+          where: { sessionId: current.session.id, status: ReservationStatus.PAYMENT_PENDING },
+          select: { id: true, createdAt: true, expiresAt: true },
+        });
+        for (const r of pending) {
+          const recalculated = paymentDeadline(fields.paymentHours, sessionData.date, r.createdAt);
+          const later = recalculated > r.expiresAt ? recalculated : r.expiresAt;
+          const next = later < sessionData.date ? later : sessionData.date;
+          if (next.getTime() !== r.expiresAt.getTime()) {
+            await tx.reservation.update({ where: { id: r.id }, data: { expiresAt: next } });
+          }
+        }
+      }
     } else {
       await tx.showSession.create({ data: { ...sessionData, showId: id } });
     }
@@ -177,9 +204,12 @@ export async function updateShow(id: string, input: ShowInput, actorUserId: stri
 // 예매 기록이 하나라도 있으면 지우지 않는다(티켓·환불 기록이 공연에 매여 있다).
 export async function deleteShow(id: string, actorUserId: string) {
   await prisma.$transaction(async (tx) => {
+    await lockShowWrites(tx);
     const show = await tx.show.findUnique({ where: { id }, include: { sessions: { select: { id: true } } } });
     if (!show) throw new HttpError(404, "공연을 찾을 수 없어요.");
     const sessionIds = show.sessions.map((s) => s.id);
+    // 세는 사이에 예매가 들어오지 않게 회차를 잠근다(들어오면 회차를 지울 때 DB 오류가 난다).
+    for (const sessionId of sessionIds) await lockSession(tx, sessionId);
     const bookings = await tx.reservation.count({ where: { sessionId: { in: sessionIds } } });
     if (bookings > 0) {
       throw new HttpError(400, "예매 기록이 있는 공연은 지울 수 없어요. 상태를 '지난 공연'이나 '준비 중'으로 바꿔 주세요.");

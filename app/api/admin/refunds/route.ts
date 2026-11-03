@@ -1,28 +1,11 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { RoleType } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { listRefunds } from "@/lib/admin-bookings";
 import { requireRoleAtLeast } from "@/lib/auth-helpers";
-import { errorResponse } from "@/lib/http";
+import { route } from "@/lib/http";
 
-export async function GET() {
-  try {
-    await requireRoleAtLeast(RoleType.ADMIN);
-    const refunds = await prisma.refund.findMany({
-      include: {
-        reservation: {
-          select: {
-            userId: true,
-            status: true,
-            qty: true,
-            user: { select: { name: true, email: true } },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-    return NextResponse.json({ refunds });
-  } catch (error) {
-    return errorResponse(error);
-  }
-}
+export const GET = route(async () => {
+  await requireRoleAtLeast(RoleType.ADMIN);
+  return NextResponse.json({ refunds: await listRefunds() });
+});

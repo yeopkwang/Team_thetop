@@ -1,66 +1,32 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { activeRoles, isAdminRole } from "@/lib/auth-helpers";
+import { HttpError, readBody, route } from "@/lib/http";
+import { loginInput } from "@/lib/inputs";
 import { createToken } from "@/lib/jwt";
-import { RoleType } from "@prisma/client";
-import { SERVER_ERROR } from "@/lib/http";
+import { prisma } from "@/lib/prisma";
 
-export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const id = String(body?.id || body?.username || body?.email || "").trim();
-    const password = String(body?.password || "");
+const WRONG = "아이디나 비밀번호가 맞지 않아요.";
+// 운영진 토큰은 관객(7일)보다 짧게 둔다. 공용 컴퓨터에서 로그아웃을 잊어도 하루 안에 풀린다.
+const ADMIN_TOKEN_SECONDS = 12 * 60 * 60;
 
-    if (!id || !password) {
-      return NextResponse.json({ error: "ID와 비밀번호를 입력해주세요." }, { status: 400 });
-    }
+// 운영진 로그인(아이디·비밀번호). 관객은 카카오로만 로그인한다.
+export const POST = route(async (req) => {
+  const { id, password } = await readBody(req, loginInput);
+  const credential = await prisma.credential.findUnique({
+    where: { username: id },
+    select: {
+      passwordHash: true,
+      user: { select: { id: true, name: true, roles: { where: activeRoles(), select: { role: { select: { type: true } } } } } },
+    },
+  });
+  if (!credential || !(await bcrypt.compare(password, credential.passwordHash))) throw new HttpError(401, WRONG);
 
-    const credential = await prisma.credential.findFirst({
-      where: {
-        OR: [{ username: id }, { user: { email: id.toLowerCase() } }],
-      },
-      include: {
-        user: {
-          include: {
-            roles: {
-              where: {
-                isActive: true,
-                OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-              },
-              include: { role: true },
-            },
-          },
-        },
-      },
-    });
+  const roles = credential.user.roles.map((r) => r.role.type);
+  if (!isAdminRole(roles)) throw new HttpError(403, "관객은 카카오 로그인으로 들어와 주세요.");
 
-    if (!credential?.user) {
-      return NextResponse.json({ error: "로그인 정보가 올바르지 않습니다." }, { status: 401 });
-    }
-
-    const ok = await bcrypt.compare(password, credential.passwordHash);
-    if (!ok) {
-      return NextResponse.json({ error: "로그인 정보가 올바르지 않습니다." }, { status: 401 });
-    }
-
-    const roles = credential.user.roles.map((r) => r.role.type);
-    const isAdmin = roles.includes(RoleType.ADMIN) || roles.includes(RoleType.SUPER_ADMIN);
-    if (!isAdmin) {
-      return NextResponse.json({ error: "일반 사용자는 카카오 로그인만 지원합니다." }, { status: 403 });
-    }
-
-    const token = createToken(credential.user.id);
-    return NextResponse.json({
-      token,
-      user: {
-        id: credential.user.id,
-        name: credential.user.name,
-        email: credential.user.email,
-        roles,
-      },
-    });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: SERVER_ERROR }, { status: 500 });
-  }
-}
+  return NextResponse.json({
+    token: createToken(credential.user.id, ADMIN_TOKEN_SECONDS),
+    user: { id: credential.user.id, name: credential.user.name, roles },
+  });
+});

@@ -12,7 +12,7 @@ export default async function PastShowsPage() {
   const shows = await getPastShows();
 
   return (
-    <main className="page-enter page pb-16 pt-6 lg:pt-10">
+    <main className="page pb-16 pt-6 lg:pt-10">
       <h1 className="text-h1 font-bold">지난 공연</h1>
       <p className="mt-1 text-ui text-ink-3">작전명문이 지금까지 올린 무대예요.</p>
 
