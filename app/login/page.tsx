@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   clearAuthState,
   getAuthProvider,
@@ -20,7 +20,6 @@ type AuthResponse = {
 };
 
 function LoginPageContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [message, setMessage] = useState("");
@@ -38,27 +37,19 @@ function LoginPageContent() {
   };
 
   useEffect(() => {
-    const hasKakaoToken = !!searchParams.get("kakaoToken");
-    if (!hasKakaoToken) {
-      void refreshMe();
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
-    const kakaoToken = searchParams.get("kakaoToken");
     const error = searchParams.get("error");
+    if (error) setMessage(error);
 
-    if (error) {
-      setMessage(error);
-    }
-
+    // 카카오 로그인 콜백은 토큰을 주소의 # 뒤에 붙여 돌려보낸다.
+    const kakaoToken = new URLSearchParams(window.location.hash.slice(1)).get("kakaoToken");
     if (kakaoToken) {
       setToken(kakaoToken);
       setAuthProvider("kakao");
       setMessage("카카오 로그인 성공");
-      router.replace("/login");
+      window.history.replaceState(null, "", "/login");
     }
-  }, [router, searchParams]);
+    void refreshMe();
+  }, [searchParams]);
 
   const handleAdminLogin = async (event: FormEvent) => {
     event.preventDefault();

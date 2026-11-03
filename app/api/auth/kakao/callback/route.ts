@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getBaseUrl } from "@/lib/app-url";
 import { prisma } from "@/lib/prisma";
 import { RoleType } from "@prisma/client";
 import { createToken } from "@/lib/jwt";
@@ -16,12 +17,6 @@ type KakaoUserResponse = {
     email?: string;
   };
 };
-
-function getBaseUrl(req: Request) {
-  if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL;
-  const url = new URL(req.url);
-  return `${url.protocol}//${url.host}`;
-}
 
 export async function GET(req: Request) {
   try {
@@ -128,8 +123,9 @@ export async function GET(req: Request) {
       return found;
     });
 
+    // 토큰은 # 뒤에 붙인다. 쿼리(?)에 두면 서버 접속 기록과 Referer에 남는다.
     const appToken = createToken(user.id);
-    return NextResponse.redirect(`${getBaseUrl(req)}/login?kakaoToken=${encodeURIComponent(appToken)}`);
+    return NextResponse.redirect(`${getBaseUrl(req)}/login#kakaoToken=${encodeURIComponent(appToken)}`);
   } catch (error: any) {
     const message = error?.message || "카카오 로그인 처리에 실패했습니다.";
     return NextResponse.redirect(`${getBaseUrl(req)}/login?error=${encodeURIComponent(message)}`);

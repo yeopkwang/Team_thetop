@@ -5,8 +5,13 @@ type TokenPayload = {
   exp: number;
 };
 
+// 기본값을 두지 않는다. 공개 레포에 적힌 값으로 서명하면 누구나 관리자 토큰을 만들 수 있다.
 function getSecret() {
-  return process.env.JWT_SECRET || "dev_next_jwt_secret_change_me_32bytes_min";
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error("JWT_SECRET 환경변수를 32자 이상으로 설정해 주세요.");
+  }
+  return secret;
 }
 
 function base64UrlEncode(value: string) {

@@ -1,10 +1,5 @@
 import { NextResponse } from "next/server";
-
-function getBaseUrl(req: Request) {
-  if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL;
-  const url = new URL(req.url);
-  return `${url.protocol}//${url.host}`;
-}
+import { getBaseUrl } from "@/lib/app-url";
 
 export async function GET(req: Request) {
   const clientId = process.env.KAKAO_CLIENT_ID;
