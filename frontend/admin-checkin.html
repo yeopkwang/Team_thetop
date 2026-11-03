@@ -1,0 +1,14 @@
+﻿<!DOCTYPE html><html><head><meta charset="UTF-8"><title>검표</title><link rel="stylesheet" href="styles.css">
+<script src="https://unpkg.com/html5-qrcode"></script></head><body>
+<header><div class="logo">검표</div><nav class="nav"><a href="/admin.html">대시보드</a></nav></header>
+<main style="padding:24px;"><div id="reader" style="width:360px"></div><div id="status" class="card" style="margin-top:16px;">대기중</div></main>
+<script src="js/api.js"></script>
+<script>
+const reader=new Html5Qrcode("reader");
+reader.start({facingMode:"environment"},{fps:10,qrbox:250},onScan,err=>{});
+async function onScan(text){
+  try{ const res=await apiPost('/admin/checkin',{ticketCode:text}); status.innerHTML=`<div class="tag">성공</div><p>${res.ticket.ticketCode}</p>`; }
+  catch(e){ status.innerHTML=`<div class="tag">오류</div><p>${e.error||'실패'}</p>`; }
+}
+</script></body></html>
+

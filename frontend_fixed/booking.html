@@ -1,0 +1,20 @@
+﻿<!DOCTYPE html><html><head><meta charset="UTF-8"><title>예매</title><link rel="stylesheet" href="styles.css"></head><body>
+<header><div class="logo">예매</div><nav class="nav"><a href="/">홈</a></nav></header>
+<main style="padding:24px;">
+  <div id="event" class="card"></div>
+  <form id="bookForm" class="card" style="margin-top:12px;">
+    <input type="number" name="qty" min="1" value="1" />
+    <button class="btn">예매</button>
+    <div id="msg"></div>
+  </form>
+</main>
+<script src="js/api.js"></script>
+<script>
+const id=new URLSearchParams(location.search).get('eventId');
+(async()=>{ const e=await apiGet('/events/'+id);
+  event.innerHTML=`<h2>${e.title}</h2><p>${new Date(e.startAt).toLocaleString()} @ ${e.venue}</p><p>가격: ${e.price}원 | 잔여 ${e.remainingStock}/${e.totalStock}</p>`;
+})();
+bookForm.onsubmit=async ev=>{ ev.preventDefault(); const qty=parseInt(new FormData(bookForm).get('qty')); try{
+  const res=await apiPost('/bookings',{eventId:Number(id),quantity:qty}); msg.textContent='예매 완료'; console.log(res); location.href='/my.html';
+}catch(err){ msg.textContent=err.error||'실패'; }};
+</script></body></html>

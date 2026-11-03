@@ -1,0 +1,8 @@
+﻿<!DOCTYPE html><html><head><meta charset="UTF-8"><title>공연안내</title><link rel="stylesheet" href="styles.css"></head><body>
+<header><div class="logo">공연안내</div><nav class="nav"><a href="/">홈</a></nav></header>
+<main style="padding:24px;"><div class="grid" id="list"></div></main>
+<script src="js/api.js"></script>
+<script>(async()=>{ const shows=await apiGet('/shows'); document.getElementById('list').innerHTML=shows.map(s=>`
+  <article class="card"><h3>${s.title}</h3><p>${(s.content||'').slice(0,120)}...</p><a href="/show-detail.html?id=${s.id}">자세히</a></article>`).join(''); })();</script>
+</body></html>
+

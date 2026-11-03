@@ -1,0 +1,73 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>작전명문 홈</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header>
+  <div class="logo">작전명문</div>
+  <nav class="nav">
+    <a href="/shows.html">공연안내</a>
+    <a href="/videos.html">영상</a>
+    <a href="/auth.html">로그인</a>
+    <a href="/my.html">내 티켓</a>
+  </nav>
+</header>
+<main style="padding:24px;">
+  <section><h2>최신 공연 공지</h2><div class="grid" id="show-cards"></div></section>
+  <section><h2>유튜브 영상</h2><div class="grid" id="video-cards"></div></section>
+  <section><h2>밴드 타임라인</h2><div id="timeline"></div></section>
+  <section><h2>내 티켓</h2><div id="my-ticket-card"></div></section>
+</main>
+<div id="modal" style="display:none;"></div>
+<script src="js/api.js"></script>
+<script>
+const timelineData=[
+  {year:'2019',text:'결성 및 첫 소극장 공연'},
+  {year:'2020',text:'첫 EP 발매, 온라인 라이브'},
+  {year:'2022',text:'여름 페스티벌 메인 스테이지'},
+  {year:'2023',text:'극장형 콘서트 투어'}
+];
+(async function load(){
+  const shows = await apiGet('/shows');
+  document.getElementById('show-cards').innerHTML = shows.slice(0,3).map(s=>
+    <article class="card">
+      <div class="tag">공지</div><h3></h3>
+      <p>...</p>
+      <a href="/show-detail.html?id=">자세히</a>
+    </article>).join('');
+  const videos = await apiGet('/videos');
+  const vc = document.getElementById('video-cards');
+  videos.slice(0,6).forEach(v=>{
+    const div=document.createElement('div'); div.className='card';
+    div.innerHTML=<h4></h4><p></p><button class="btn" data-yt="">재생</button>;
+    div.querySelector('button').onclick=()=>openModal(v.youtubeId); vc.appendChild(div);
+  });
+  const tl=document.getElementById('timeline');
+  tl.innerHTML=timelineData.map(i=><div class="card"><div class="tag"></div><p></p></div>).join('');
+  try {
+    await apiGet('/auth/me');
+    const tickets = await apiGet('/my/tickets');
+    if (tickets.length) renderTicket(tickets[0]);
+  } catch(e) {
+    document.getElementById('my-ticket-card').innerHTML = '로그인 필요';
+  }
+})();
+function openModal(id){
+  const m=document.getElementById('modal');
+  m.innerHTML=<div class="modal" onclick="closeModal(event)">
+    <iframe src="https://www.youtube.com/embed/?autoplay=1" allowfullscreen></iframe></div>;
+  m.style.display='block';
+}
+function closeModal(e){ if(e.target.classList.contains('modal')){ const m=document.getElementById('modal'); m.innerHTML=''; m.style.display='none'; }}
+function renderTicket(t){
+  document.getElementById('my-ticket-card').innerHTML=<div class="ticket" onclick="location.href='/my.html#'">
+    <div><div class="tag">내 티켓</div><h3></h3>
+    <p></p><p></p></div><div id="qr"></div></div>;
+  const sc=document.createElement('script'); sc.src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"; sc.onload=()=>{ QRCode.toCanvas(document.getElementById('qr'), t.ticketCode, {width:120}); }; document.body.appendChild(sc);
+}
+</script>
+</body>
+</html>

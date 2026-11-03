@@ -1,0 +1,73 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>������� Ȩ</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header>
+  <div class="logo">�������</div>
+  <nav class="nav">
+    <a href="/shows.html">�����ȳ�</a>
+    <a href="/videos.html">����</a>
+    <a href="/auth.html">�α���</a>
+    <a href="/my.html">�� Ƽ��</a>
+  </nav>
+</header>
+<main style="padding:24px;">
+  <section><h2>�ֽ� ���� ����</h2><div class="grid" id="show-cards"></div></section>
+  <section><h2>��Ʃ�� ����</h2><div class="grid" id="video-cards"></div></section>
+  <section><h2>��� Ÿ�Ӷ���</h2><div id="timeline"></div></section>
+  <section><h2>�� Ƽ��</h2><div id="my-ticket-card"></div></section>
+</main>
+<div id="modal" style="display:none;"></div>
+<script src="js/api.js"></script>
+<script>
+const timelineData=[
+  {year:'2019',text:'�Ἲ �� ù �ұ��� ����'},
+  {year:'2020',text:'ù EP �߸�, �¶��� ���̺�'},
+  {year:'2022',text:'���� �佺Ƽ�� ���� ��������'},
+  {year:'2023',text:'������ �ܼ�Ʈ ����'}
+];
+(async function load(){
+  const shows = await apiGet('/shows');
+  document.getElementById('show-cards').innerHTML = shows.slice(0,3).map(s=>`
+    <article class="card">
+      <div class="tag">����</div><h3>${s.title}</h3>
+      <p>${(s.content||'').slice(0,80)}...</p>
+      <a href="/show-detail.html?id=${s.id}">�ڼ���</a>
+    </article>`).join('');
+  const videos = await apiGet('/videos');
+  const vc = document.getElementById('video-cards');
+  videos.slice(0,6).forEach(v=>{
+    const div=document.createElement('div'); div.className='card';
+    div.innerHTML=`<h4>${v.title}</h4><p>${v.description||''}</p><button class="btn" data-yt="${v.youtubeId}">���</button>`;
+    div.querySelector('button').onclick=()=>openModal(v.youtubeId); vc.appendChild(div);
+  });
+  const tl=document.getElementById('timeline');
+  tl.innerHTML=timelineData.map(i=>`<div class="card"><div class="tag">${i.year}</div><p>${i.text}</p></div>`).join('');
+  try {
+    await apiGet('/auth/me');
+    const tickets = await apiGet('/my/tickets');
+    if (tickets.length) renderTicket(tickets[0]);
+  } catch(e) {
+    document.getElementById('my-ticket-card').innerHTML = '�α��� �ʿ�';
+  }
+})();
+function openModal(id){
+  const m=document.getElementById('modal');
+  m.innerHTML=`<div class="modal" onclick="closeModal(event)">
+    <iframe src="https://www.youtube.com/embed/${id}?autoplay=1" allowfullscreen></iframe></div>`;
+  m.style.display='block';
+}
+function closeModal(e){ if(e.target.classList.contains('modal')){ const m=document.getElementById('modal'); m.innerHTML=''; m.style.display='none'; }}
+function renderTicket(t){
+  document.getElementById('my-ticket-card').innerHTML=`<div class="ticket" onclick="location.href='/my.html#${t.id}'">
+    <div><div class="tag">�� Ƽ��</div><h3>${t.booking.event.title}</h3>
+    <p>${new Date(t.booking.event.startAt).toLocaleString()}</p><p>${t.booking.event.venue}</p></div><div id="qr"></div></div>`;
+  const sc=document.createElement('script'); sc.src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"; sc.onload=()=>{ QRCode.toCanvas(document.getElementById('qr'), t.ticketCode, {width:120}); }; document.body.appendChild(sc);
+}
+</script>
+</body>
+</html>

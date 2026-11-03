@@ -1,0 +1,36 @@
+﻿<!DOCTYPE html><html><head><meta charset="UTF-8"><title>내 예매/티켓</title><link rel="stylesheet" href="styles.css"></head><body>
+<header><div class="logo">내 티켓</div><nav class="nav"><a href="/">홈</a></nav></header>
+<main style="padding:24px;">
+  <section><h3>예매 목록</h3><div id="bookings" class="grid"></div></section>
+  <section><h3>티켓</h3><div id="tickets" class="grid"></div></section>
+</main>
+<div id="modal" style="display:none;"></div>
+<script src="js/api.js"></script>
+<script>
+(async()=>{
+  try{
+    const bookings=await apiGet('/my/bookings'); bookingsDiv(bookings);
+    const tickets=await apiGet('/my/tickets'); ticketsDiv(tickets);
+  }catch(e){ alert('로그인 필요'); location.href='/auth.html'; }
+})();
+function bookingsDiv(list){ document.getElementById('bookings').innerHTML=list.map(b=>`
+  <article class="card"><div class="tag">${b.status}</div><h4>${b.event.title}</h4><p>${new Date(b.event.startAt).toLocaleString()}</p><p>수량 ${b.quantity}</p></article>`).join(''); }
+function ticketsDiv(list){
+  const c=document.getElementById('tickets');
+  list.forEach(t=>{
+    const div=document.createElement('div'); div.className='ticket'; div.innerHTML=`
+      <div><div class="tag">티켓</div><h4>${t.booking.event.title}</h4><p>${new Date(t.booking.event.startAt).toLocaleString()}</p><p>${t.booking.event.venue}</p></div>
+      <div id="qr-${t.id}"></div>`;
+    div.onclick=()=>openModal(t);
+    c.appendChild(div);
+    const sc=document.createElement('script'); sc.src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"; sc.onload=()=>{ QRCode.toCanvas(document.getElementById('qr-'+t.id), t.ticketCode, {width:100}); }; document.body.appendChild(sc);
+  });
+}
+function openModal(t){
+  const m=document.getElementById('modal');
+  m.innerHTML=`<div class="modal" onclick="closeModal(event)">
+    <div class="card"><h3>${t.booking.event.title}</h3><p>${t.ticketCode}</p><p>${new Date(t.booking.event.startAt).toLocaleString()}</p><p>${t.booking.event.venue}</p></div>
+  </div>`; m.style.display='flex';
+}
+function closeModal(e){ if(e.target.classList.contains('modal')){ const m=document.getElementById('modal'); m.innerHTML=''; m.style.display='none'; } }
+</script></body></html>
