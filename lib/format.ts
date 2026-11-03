@@ -33,3 +33,21 @@ export function won(amount: number) {
 export function bookingNumber(id: string) {
   return id.slice(-8).toUpperCase();
 }
+
+// 2027.02.21 (일)
+export function formatDate(date: Date | string) {
+  const p = parts(date, { year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" });
+  return `${p.year}.${p.month}.${p.day} (${p.weekday})`;
+}
+
+// 18:00
+export function formatTime(date: Date | string) {
+  const p = parts(date, { hour: "2-digit", minute: "2-digit" });
+  return `${p.hour}:${p.minute}`;
+}
+
+// 달력에서 날짜를 비교할 때 쓰는 한국 시간 기준 날짜 키: 2027-02-21
+export function kstDayKey(date: Date | string) {
+  const p = parts(date, { year: "numeric", month: "2-digit", day: "2-digit" });
+  return `${p.year}-${p.month}-${p.day}`;
+}

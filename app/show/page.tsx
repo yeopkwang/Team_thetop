@@ -2,10 +2,14 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from "next";
 import EmptyState from "@/components/EmptyState";
 import ShowText from "@/components/ShowText";
-import BookingPanel, { MobileBookingBar } from "@/components/show/BookingPanel";
+import BookingCalendar from "@/components/show/BookingCalendar";
+import MobileBookingBar from "@/components/show/MobileBookingBar";
 import { MobilePosterHero } from "@/components/show/Poster";
+import SalesInfoTable from "@/components/show/SalesInfoTable";
 import ShowSummary from "@/components/show/ShowSummary";
 import ShowTabs from "@/components/show/ShowTabs";
+import VenueInfo from "@/components/show/VenueInfo";
+import { formatDate, formatTime, kstDayKey } from "@/lib/format";
 import { getCurrentShow, getSessionAvailability } from "@/lib/show";
 
 export const metadata: Metadata = { title: "공연 안내" };
@@ -24,29 +28,73 @@ export default async function ShowPage() {
   }
 
   const sessions = await getSessionAvailability(show);
+  const first = sessions[0];
+  const last = sessions[sessions.length - 1];
+  const period = !first
+    ? ""
+    : kstDayKey(first.date) === kstDayKey(last.date)
+      ? formatDate(first.date)
+      : `${formatDate(first.date)} ~ ${formatDate(last.date)}`;
+
   const tabs = [
-    show.introText && { id: "intro", label: "공연 소개", content: <ShowText text={show.introText} /> },
-    show.salesText && { id: "sales", label: "판매 정보", content: <ShowText text={show.salesText} /> },
-  ].filter(Boolean) as { id: string; label: string; content: React.ReactNode }[];
+    {
+      id: "info",
+      label: "공연정보",
+      content: (
+        <div className="space-y-10">
+          {show.notice && (
+            <section>
+              <h3 className="mb-2 text-[16px] font-bold">공지사항</h3>
+              <p className="text-ui leading-[1.8] text-ink-2">{show.notice}</p>
+            </section>
+          )}
+          {show.introText && <ShowText text={show.introText} />}
+        </div>
+      ),
+    },
+    {
+      id: "sales",
+      label: "판매정보",
+      content: (
+        <div className="space-y-10">
+          <SalesInfoTable show={show} period={period} />
+          {show.salesText && <ShowText text={show.salesText} />}
+        </div>
+      ),
+    },
+    ...(show.venue
+      ? [{ id: "venue", label: "장소정보", content: <VenueInfo venue={show.venue} address={show.venueAddress} /> }]
+      : []),
+  ];
 
   return (
     <main className="pb-16">
       <MobilePosterHero src={show.posterUrl} title={show.title} />
 
-      <div className="page lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-12 lg:pt-10">
+      <div className="page lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-10 lg:pt-10">
         <div className="min-w-0">
-          <ShowSummary show={show} />
+          <ShowSummary show={show} period={period} />
           <ShowTabs tabs={tabs} />
         </div>
 
         <aside className="hidden lg:block">
           <div className="sticky top-[calc(var(--header-h)+24px)]">
-            <BookingPanel sessions={sessions} price={show.price} />
+            <BookingCalendar
+              price={show.price}
+              sessions={sessions.map((s) => ({
+                id: s.id,
+                title: s.title,
+                dayKey: kstDayKey(s.date),
+                time: formatTime(s.date),
+                remaining: s.remaining,
+                total: s.total,
+              }))}
+            />
           </div>
         </aside>
       </div>
 
-      <MobileBookingBar sessions={sessions} price={show.price} />
+      <MobileBookingBar soldOut={sessions.every((s) => s.remaining === 0)} />
     </main>
   );
 }

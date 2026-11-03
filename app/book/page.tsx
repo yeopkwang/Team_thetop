@@ -7,7 +7,7 @@ import { getCurrentShow, getSessionAvailability } from "@/lib/show";
 
 export const metadata: Metadata = { title: "예매하기" };
 
-export default async function BookPage() {
+export default async function BookPage({ searchParams }: { searchParams: { session?: string } }) {
   const show = await getCurrentShow();
   if (!show) {
     return (
@@ -24,6 +24,7 @@ export default async function BookPage() {
 
   return (
     <BookingForm
+      initialSessionId={searchParams.session}
       show={{
         title: show.title,
         posterUrl: show.posterUrl,

@@ -36,9 +36,20 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 }
 
 // 예매 화면: 회차 → 관심 공연자 → 입금 방법을 차례로 고르고 예매한다.
-export default function BookingForm({ show, sessions }: { show: ShowProps; sessions: SessionProps[] }) {
+export default function BookingForm({
+  show,
+  sessions,
+  initialSessionId,
+}: {
+  show: ShowProps;
+  sessions: SessionProps[];
+  initialSessionId?: string;
+}) {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
-  const [sessionId, setSessionId] = useState(sessions.find((s) => s.remaining > 0)?.id || "");
+  // 공연 안내 달력에서 고른 회차가 있으면 그것부터, 없으면 남은 좌석이 있는 첫 회차
+  const [sessionId, setSessionId] = useState(
+    sessions.find((s) => s.id === initialSessionId && s.remaining > 0)?.id || sessions.find((s) => s.remaining > 0)?.id || ""
+  );
   const [performer, setPerformer] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
