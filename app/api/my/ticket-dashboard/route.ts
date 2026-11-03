@@ -21,6 +21,9 @@ export async function GET() {
 
     const showInfo = {
       title: show.title,
+      dateLabel: show.dateLabel,
+      timeLabel: show.timeLabel,
+      venue: show.venue,
       price: show.price,
       paymentBank: show.paymentBank,
       paymentAccount: show.paymentAccount,

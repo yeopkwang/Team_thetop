@@ -1,18 +1,47 @@
 export const dynamic = "force-dynamic";
+import type { Metadata } from "next";
 import BookingForm from "@/components/BookingForm";
-import ShowInfo from "@/components/ShowInfo";
-import { getCurrentShow } from "@/lib/show";
+import EmptyState from "@/components/EmptyState";
+import { formatSessionDate } from "@/lib/format";
+import { getCurrentShow, getSessionAvailability } from "@/lib/show";
+
+export const metadata: Metadata = { title: "예매하기" };
 
 export default async function BookPage() {
   const show = await getCurrentShow();
   if (!show) {
-    return <main className="container-base">지금 예매 중인 공연이 없습니다.</main>;
+    return (
+      <main className="page">
+        <EmptyState
+          title="지금 예매 중인 공연이 없어요"
+          description="다음 공연 예매가 열리면 이곳에서 바로 예매할 수 있어요."
+        />
+      </main>
+    );
   }
 
+  const sessions = await getSessionAvailability(show);
+
   return (
-    <main className="container-base space-y-6">
-      <ShowInfo show={show} />
-      <BookingForm />
-    </main>
+    <BookingForm
+      show={{
+        title: show.title,
+        posterUrl: show.posterUrl,
+        dateLabel: show.dateLabel,
+        timeLabel: show.timeLabel,
+        venue: show.venue,
+        price: show.price,
+        paymentBank: show.paymentBank,
+        paymentAccount: show.paymentAccount,
+        paymentHolder: show.paymentHolder,
+      }}
+      sessions={sessions.map((s) => ({
+        id: s.id,
+        title: s.title,
+        dateText: formatSessionDate(s.date),
+        remaining: s.remaining,
+        total: s.total,
+      }))}
+    />
   );
 }

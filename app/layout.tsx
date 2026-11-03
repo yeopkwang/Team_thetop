@@ -1,32 +1,28 @@
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
-import type { Metadata } from "next";
-import SidebarNav from "@/components/SidebarNav";
+import type { Metadata, Viewport } from "next";
+import SiteHeader from "@/components/SiteHeader";
+import SiteFooter from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
-  title: "작전명;문",
-  description: "공연 예매 및 관리자 페이지",
+  title: { default: "작전명;문 공연 예매", template: "%s | 작전명;문" },
+  description: "밴드 반송 연례 공연의 예매, 입금 안내, 모바일 QR 티켓",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#ffffff",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body className="font-sans bg-slate-50 text-slate-900">
-        <div className="min-h-screen md:flex md:flex-row">
-          <aside className="sticky top-0 z-20 border-b bg-white/80 backdrop-blur md:w-64 md:border-b-0 md:border-r supports-[backdrop-filter]:bg-white/70">
-            <div className="p-4 md:p-6">
-              <div className="text-xl font-bold text-slate-900">작전명;문</div>
-              <p className="mt-1 text-xs text-slate-500">공연 예매 서비스</p>
-            </div>
-            <div className="px-2 pb-3">
-              <SidebarNav />
-            </div>
-          </aside>
-          <div className="min-h-screen flex-1">{children}</div>
-        </div>
+      <body className="flex min-h-dvh flex-col">
+        <SiteHeader />
+        <div className="flex-1">{children}</div>
+        <SiteFooter />
       </body>
     </html>
   );

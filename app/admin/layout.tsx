@@ -2,13 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getToken, apiFetch } from "@/lib/api-client";
+import AdminNav from "@/components/AdminNav";
+import { apiFetch, getToken } from "@/lib/api-client";
 
-type MeResponse = {
-  user?: {
-    roles?: string[];
-  };
-};
+type MeResponse = { user?: { roles?: string[] } };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -23,19 +20,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         router.replace("/login");
         return;
       }
-
       try {
         const me = await apiFetch<MeResponse>("/auth/me");
         const roles = me?.user?.roles || [];
-        const isAdmin = roles.includes("ADMIN") || roles.includes("SUPER_ADMIN");
-        if (!isAdmin) {
+        if (!roles.includes("ADMIN") && !roles.includes("SUPER_ADMIN")) {
           router.replace("/");
           return;
         }
-        if (mounted) {
-          setAllowed(true);
-          setChecked(true);
-        }
+        if (mounted) setAllowed(true);
       } catch {
         router.replace("/login");
       } finally {
@@ -43,16 +35,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
     };
 
-    check();
+    void check();
     return () => {
       mounted = false;
     };
   }, [router]);
 
   if (!checked) {
-    return <main className="container-base">권한 확인 중...</main>;
+    return <main className="page py-20 text-center text-ui text-ink-3">운영진 계정인지 확인하고 있어요.</main>;
   }
   if (!allowed) return null;
 
-  return <>{children}</>;
+  return (
+    <main className="page pb-16 pt-6 lg:pt-10">
+      <h1 className="text-h1 font-bold">관리자</h1>
+      <div className="mt-4">
+        <AdminNav />
+      </div>
+      <div className="pt-6 lg:pt-8">{children}</div>
+    </main>
+  );
 }

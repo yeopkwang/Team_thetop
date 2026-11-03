@@ -2,18 +2,95 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light;
+@layer base {
+  :root {
+    color-scheme: light;
+    --header-h: 96px;
+  }
+  @media (min-width: 1024px) {
+    :root {
+      --header-h: 64px;
+    }
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-white font-sans text-body text-ink antialiased;
+    /* 한국어는 어절 단위로 줄을 바꿔야 읽기 편하다 */
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+
+  :focus-visible {
+    outline: 2px solid theme("colors.brand.600");
+    outline-offset: 2px;
+  }
+
+  input,
+  textarea,
+  select {
+    font-size: 16px; /* iOS가 입력할 때 확대하지 않게 */
+  }
 }
 
-body {
-  @apply bg-slate-50 text-slate-900 min-h-screen;
+@layer components {
+  .page {
+    @apply mx-auto w-full max-w-page px-4 md:px-6;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-4 font-semibold transition-colors disabled:cursor-not-allowed;
+    min-height: 44px;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700 disabled:bg-ink-4;
+  }
+  .btn-secondary {
+    @apply btn border border-line-strong bg-white text-ink hover:border-ink-3 disabled:text-ink-4;
+  }
+  .btn-ghost {
+    @apply btn px-2 text-ink-2 underline-offset-4 hover:text-ink hover:underline;
+  }
+  .btn-lg {
+    @apply text-lead;
+    min-height: 54px;
+  }
+  .btn-sm {
+    @apply px-3 text-meta;
+    min-height: 36px;
+  }
+
+  .field {
+    @apply w-full rounded-md border border-line-strong bg-white px-3 py-2.5 text-ink placeholder:text-ink-4 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100;
+  }
+
+  .label {
+    @apply block text-ui font-semibold text-ink;
+  }
+
+  /* 모바일 하단 고정 바: 아이폰 홈 표시줄만큼 띄운다. 바가 있는 화면은 그 높이만큼 아래를 비운다. */
+  .bottom-bar {
+    @apply fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 backdrop-blur;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
-a {
-  @apply text-blue-600 hover:text-blue-800;
+@media (max-width: 1023px) {
+  body:has(.bottom-bar) {
+    padding-bottom: calc(78px + env(safe-area-inset-bottom));
+  }
 }
 
-.container-base {
-  @apply max-w-5xl mx-auto px-4 py-6;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

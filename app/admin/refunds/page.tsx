@@ -1,25 +1,23 @@
 "use client";
 
-import AdminNav from "@/components/AdminNav";
 import { useEffect, useState } from "react";
+import StatusBadge from "@/components/StatusBadge";
 import { apiFetch } from "@/lib/api-client";
+import { bookingNumber, formatDateTime } from "@/lib/format";
+import { refundStatus } from "@/lib/status";
 
 type RefundItem = {
   id: string;
   reservationId: string;
   status: string;
   createdAt: string;
-  reservation?: {
-    userId: string;
-    user?: { name?: string | null; email?: string | null };
-    status: string;
-    qty?: number;
-  };
+  reservation?: { userId: string; user?: { name?: string | null; email?: string | null } };
 };
 
 export default function AdminRefundsPage() {
   const [items, setItems] = useState<RefundItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   const load = async () => {
@@ -28,7 +26,7 @@ export default function AdminRefundsPage() {
       const data = await apiFetch<{ refunds: RefundItem[] }>("/admin/refunds");
       setItems(Array.isArray(data?.refunds) ? data.refunds : []);
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "환불 요청 목록을 불러오지 못했습니다.");
+      setMessage(error instanceof Error ? error.message : "환불 요청 목록을 불러오지 못했어요.");
     } finally {
       setLoading(false);
     }
@@ -38,50 +36,69 @@ export default function AdminRefundsPage() {
     void load();
   }, []);
 
-  const refund = async (id: string) => {
+  const complete = async (item: RefundItem) => {
+    const name = item.reservation?.user?.name || "예매자";
+    if (!window.confirm(`${name}님께 송금을 마쳤나요? 환불 완료로 바꾸면 되돌릴 수 없어요.`)) return;
+    setBusy(item.id);
     setMessage("");
     try {
-      await apiFetch(`/admin/refunds/${id}/refund`, { method: "POST", bodyJson: {} });
-      setMessage("환불 완료 처리되었습니다.");
+      await apiFetch(`/admin/refunds/${item.id}/refund`, { method: "POST", bodyJson: {} });
+      setMessage(`${name}님 환불을 완료했어요.`);
       await load();
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "환불 완료 처리에 실패했습니다.");
+      setMessage(error instanceof Error ? error.message : "환불 완료로 바꾸지 못했어요.");
+    } finally {
+      setBusy(null);
     }
   };
 
+  const waiting = items.filter((r) => r.status !== "REFUNDED").length;
+
   return (
-    <main className="container-base space-y-4">
-      <h1 className="text-2xl font-bold">환불 관리</h1>
+    <section>
+      <h2 className="text-lead font-bold">
+        환불 요청 <span className="text-brand-600">{loading ? "" : waiting}</span>
+      </h2>
+      <p className="mt-1 text-meta text-ink-3">관객이 카카오톡으로 알려 준 계좌로 송금한 뒤 환불 완료를 눌러 주세요.</p>
 
-      <AdminNav />
+      {message && (
+        <p role="status" className="mt-4 rounded-md bg-surface px-4 py-3 text-meta text-ink-2">
+          {message}
+        </p>
+      )}
 
-      {message && <div className="text-sm text-slate-700">{message}</div>}
-
-      <div className="grid gap-3">
-        {loading && <div className="text-sm text-slate-500">페이지를 준비하고 있습니다.</div>}
-        {!loading && items.length === 0 && <div className="text-sm text-slate-500">환불 요청 내역이 없습니다.</div>}
-
-        {items.map((r) => (
-          <div key={r.id} className="rounded border border-slate-200 p-3 space-y-1">
-            <div className="font-semibold">환불 ID: {r.id}</div>
-            <div className="text-xs text-slate-500">예약 ID: {r.reservationId}</div>
-            <div className="text-xs text-slate-500">예약자 ID: {r.reservation?.userId || "-"}</div>
-            <div className="text-xs text-slate-500">예약자 이름: {r.reservation?.user?.name || "-"}</div>
-            <div className="text-xs text-slate-500">상태: {r.status}</div>
-            <div className="text-xs text-slate-500">요청 시각: {new Date(r.createdAt).toLocaleString("ko-KR")}</div>
-
-            {r.status !== "REFUNDED" && (
-              <button
-                type="button"
-                onClick={() => void refund(r.id)}
-                className="mt-2 rounded bg-slate-900 px-3 py-1 text-sm font-semibold text-white hover:bg-slate-800"
-              >
-                환불 완료 처리
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-    </main>
+      <ul className="mt-4 divide-y divide-line border-y border-line">
+        {loading && <li className="py-6 text-center text-meta text-ink-3">불러오는 중</li>}
+        {!loading && items.length === 0 && <li className="py-10 text-center text-ui text-ink-3">환불 요청이 없어요.</li>}
+        {items.map((r) => {
+          const s = refundStatus(r.status);
+          return (
+            <li key={r.id} className="flex items-center justify-between gap-4 py-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-[15px] font-semibold">{r.reservation?.user?.name || "이름 없음"}</p>
+                  <StatusBadge label={s.label} tone={s.tone} />
+                </div>
+                <p className="mt-0.5 text-meta text-ink-3">
+                  예매번호 {bookingNumber(r.reservationId)}
+                  <span className="mx-1.5 text-line-strong">|</span>
+                  {formatDateTime(r.createdAt)} 요청
+                </p>
+              </div>
+              {r.status !== "REFUNDED" && (
+                <button
+                  type="button"
+                  disabled={busy === r.id}
+                  onClick={() => void complete(r)}
+                  className="btn-primary btn-sm shrink-0"
+                >
+                  {busy === r.id ? "처리 중" : "환불 완료"}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

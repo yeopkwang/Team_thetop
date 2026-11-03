@@ -1,143 +1,259 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/lib/api-client";
+import { useEffect, useState } from "react";
+import { ApiError, apiFetch, getToken } from "@/lib/api-client";
+import { won } from "@/lib/format";
+import { KakaoIcon } from "./icons";
+import Poster from "./show/Poster";
 
-type EventItem = {
-  id: string;
-  startAt: string;
-  totalStock: number;
-  remainingStock: number;
+type ShowProps = {
+  title: string;
+  posterUrl: string | null;
+  dateLabel: string;
+  timeLabel: string;
+  venue: string;
+  price: number;
+  paymentBank: string;
+  paymentAccount: string;
+  paymentHolder: string;
 };
 
-type BookingResponse = {
-  booking: { id: string };
-};
+type SessionProps = { id: string; title: string; dateText: string; remaining: number; total: number };
 
-// 예매 화면 아래쪽의 예매 폼. 잔여석은 /api/events에서 그때그때 받아 온다.
-export default function BookingForm() {
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [preferredPerformerName, setPreferredPerformerName] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  return (
+    <section className="border-t border-line pt-6 first:border-t-0 first:pt-0">
+      <h2 className="flex items-center gap-2.5 text-lead font-bold">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink text-cap font-bold text-white">
+          {n}
+        </span>
+        {title}
+      </h2>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+// 예매 화면: 회차 → 관심 공연자 → 입금 방법을 차례로 고르고 예매한다.
+export default function BookingForm({ show, sessions }: { show: ShowProps; sessions: SessionProps[] }) {
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const [sessionId, setSessionId] = useState(sessions.find((s) => s.remaining > 0)?.id || "");
+  const [performer, setPerformer] = useState("");
+  const [agreed, setAgreed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const data = await apiFetch<EventItem[]>("/events");
-        const safe = Array.isArray(data) ? data : [];
-        setEvents(safe);
-        if (safe.length > 0) setSelectedSessionId(safe[0].id);
-      } catch (loadError: unknown) {
-        setError(loadError instanceof Error ? loadError.message : "공연 정보를 불러오지 못했습니다.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
+    setLoggedIn(!!getToken());
   }, []);
 
-  const selectedSession = useMemo(
-    () => events.find((event) => event.id === selectedSessionId) || events[0] || null,
-    [events, selectedSessionId]
-  );
+  const selected = sessions.find((s) => s.id === sessionId);
+  const ready = Boolean(loggedIn && selected && performer.trim() && agreed);
 
-  const trimmedPreferredPerformerName = preferredPerformerName.trim();
-  const canSubmit = Boolean(selectedSession && trimmedPreferredPerformerName);
+  const missing = !loggedIn
+    ? "로그인하면 예매할 수 있어요."
+    : !selected
+      ? "예매할 수 있는 회차가 없어요."
+      : !performer.trim()
+        ? "관심 있는 공연자를 적어 주세요."
+        : !agreed
+          ? "취소·환불 규정에 동의해 주세요."
+          : "";
 
   const submit = async () => {
-    if (isSubmitting) {
-      setMessage("예매가 진행중입니다. 잠시만 기다려주세요.");
-      return;
-    }
-
+    if (!ready || submitting) return;
+    setSubmitting(true);
     setMessage("");
-    if (!selectedSessionId) {
-      setMessage("예매 가능한 회차가 없습니다.");
-      return;
-    }
-    if (!trimmedPreferredPerformerName) {
-      setMessage("관심 있는 공연자 성함을 입력해 주세요. 없다면 '없음'을 입력해 주세요.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setMessage("예매가 진행중입니다. 잠시만 기다려주세요.");
-
     try {
-      await apiFetch<BookingResponse>("/bookings", {
+      await apiFetch("/bookings", {
         method: "POST",
-        bodyJson: {
-          eventId: selectedSessionId,
-          quantity: 1,
-          preferredPerformerName: trimmedPreferredPerformerName,
-        },
+        bodyJson: { eventId: sessionId, quantity: 1, preferredPerformerName: performer.trim() },
       });
-      localStorage.setItem("hasBooked", "1");
       window.location.href = "/myticket";
-    } catch (submitError: unknown) {
-      setMessage(submitError instanceof Error ? submitError.message : "예매 요청에 실패했습니다.");
-    } finally {
-      setIsSubmitting(false);
+    } catch (error: unknown) {
+      if (error instanceof ApiError && error.status === 401) setLoggedIn(false);
+      setMessage(error instanceof Error ? error.message : "예매하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+      setSubmitting(false);
     }
   };
 
-  if (loading) return <section className="rounded-2xl bg-white p-5 shadow md:p-6">잔여석을 확인하고 있습니다.</section>;
-  if (error) return <section className="rounded-2xl bg-white p-5 shadow md:p-6">오류: {error}</section>;
+  const submitLabel = submitting ? "예매하는 중" : "예매하기";
 
   return (
-    <section className="space-y-4 rounded-2xl bg-white p-5 shadow md:p-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">예매하기</h2>
-        <Link
-          href="/myticket"
-          className="inline-flex items-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-        >
-          내 티켓 확인
-        </Link>
-      </div>
+    <main className="pb-16">
+      <div className="page pt-6 lg:pt-10">
+        <h1 className="text-h1 font-bold">예매하기</h1>
 
-      <div className="space-y-2">
-        <p className="text-sm text-slate-600">1인 1매만 예매 가능합니다.</p>
-        {selectedSession ? (
-          <div className="rounded border p-3 text-sm text-slate-700">
-            잔여 좌석: {Math.max(0, selectedSession.remainingStock)} / {selectedSession.totalStock}
+        <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-10">
+          <div className="space-y-8">
+            {loggedIn === false && (
+              <div className="flex flex-col gap-3 rounded-lg bg-brand-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-ui text-brand-800">카카오로 로그인하면 바로 예매할 수 있어요.</p>
+                <Link href="/login" className="btn btn-sm bg-kakao text-black/85 hover:brightness-95">
+                  <KakaoIcon className="h-4 w-4" />
+                  카카오 로그인
+                </Link>
+              </div>
+            )}
+
+            <Step n={1} title="관람 회차">
+              <div className="space-y-2" role="radiogroup" aria-label="관람 회차">
+                {sessions.map((s) => {
+                  const checked = s.id === sessionId;
+                  const soldOut = s.remaining === 0;
+                  return (
+                    <label
+                      key={s.id}
+                      className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg border px-4 py-3.5 ${
+                        soldOut
+                          ? "cursor-not-allowed border-line bg-surface text-ink-3"
+                          : checked
+                            ? "border-brand-600 bg-brand-50"
+                            : "border-line-strong hover:border-ink-3"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="session"
+                        className="sr-only"
+                        checked={checked}
+                        disabled={soldOut}
+                        onChange={() => setSessionId(s.id)}
+                      />
+                      <span>
+                        <span className="block text-[15px] font-semibold">{s.dateText}</span>
+                        <span className="block text-meta text-ink-3">{s.title}</span>
+                      </span>
+                      <span className={`shrink-0 text-meta font-semibold ${soldOut ? "" : "text-brand-600"}`}>
+                        {soldOut ? "매진" : `${s.remaining}석 남음`}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </Step>
+
+            <Step n={2} title="관심 있는 공연자">
+              <p className="text-ui text-ink-2">초대해 준 공연자가 있으면 이름을 적어 주세요. 없으면 &apos;없음&apos;을 눌러 주세요.</p>
+              <div className="mt-3 flex gap-2">
+                <label htmlFor="performer" className="sr-only">
+                  관심 있는 공연자 이름
+                </label>
+                <input
+                  id="performer"
+                  value={performer}
+                  onChange={(e) => setPerformer(e.target.value)}
+                  placeholder="예: 홍길동"
+                  maxLength={50}
+                  className="field"
+                />
+                <button type="button" onClick={() => setPerformer("없음")} className="btn-secondary shrink-0">
+                  없음
+                </button>
+              </div>
+            </Step>
+
+            <Step n={3} title="입금 방법">
+              <div className="rounded-lg border border-line">
+                <div className="flex items-center justify-between border-b border-line px-4 py-3">
+                  <span className="text-[15px] font-semibold">무통장 입금</span>
+                  <span className="text-meta text-ink-3">예매 후 입금</span>
+                </div>
+                <dl className="space-y-2 px-4 py-4 text-ui">
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-ink-3">입금 계좌</dt>
+                    <dd className="text-right font-semibold">
+                      {show.paymentBank} {show.paymentAccount}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-ink-3">예금주</dt>
+                    <dd>{show.paymentHolder}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-ink-3">입금 금액</dt>
+                    <dd className="font-semibold">{won(show.price)}</dd>
+                  </div>
+                </dl>
+              </div>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-meta text-ink-2">
+                <li>입금자명은 관람객 본인의 실명으로 해 주세요.</li>
+                <li>입금이 확인되면 마이 티켓에 입장용 QR 티켓이 발급돼요.</li>
+              </ul>
+            </Step>
           </div>
-        ) : (
-          <div className="rounded border p-3 text-sm text-slate-700">예매 가능한 회차가 없습니다.</div>
-        )}
+
+          <aside className="mt-10 lg:sticky lg:top-[calc(var(--header-h)+24px)] lg:mt-0">
+            <div className="rounded-lg border border-line bg-white">
+              <div className="flex gap-4 border-b border-line p-5">
+                <Poster src={show.posterUrl} title={show.title} className="!w-16 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-[15px] font-bold leading-6">{show.title}</p>
+                  <p className="mt-1 text-meta text-ink-3">
+                    {show.dateLabel} {show.timeLabel}
+                  </p>
+                  <p className="text-meta text-ink-3">{show.venue}</p>
+                </div>
+              </div>
+
+              <dl className="space-y-2 px-5 py-4 text-ui">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-ink-3">회차</dt>
+                  <dd className="text-right">{selected ? selected.dateText : "선택 안 함"}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-ink-3">매수</dt>
+                  <dd>1매 (1인 1매)</dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-4 border-t border-line pt-3">
+                  <dt className="font-semibold">총 결제금액</dt>
+                  <dd className="text-h2 font-bold text-brand-600">{won(show.price)}</dd>
+                </div>
+              </dl>
+
+              <div className="space-y-3 px-5 pb-5">
+                <label className="flex cursor-pointer items-start gap-2.5 rounded-md bg-surface p-3 text-meta text-ink-2">
+                  <input
+                    type="checkbox"
+                    checked={agreed}
+                    onChange={(e) => setAgreed(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
+                  />
+                  <span>
+                    취소·환불 규정을 확인했고 동의해요. 규정은{" "}
+                    <Link href="/" className="font-semibold text-ink underline underline-offset-2">
+                      공연 안내의 판매 정보
+                    </Link>
+                    에 있어요.
+                  </span>
+                </label>
+
+                <button type="button" onClick={submit} disabled={!ready || submitting} className="btn-primary btn-lg hidden w-full lg:flex">
+                  {submitLabel}
+                </button>
+                {(message || missing) && (
+                  <p role="status" className={`text-meta ${message ? "text-brand-600" : "text-ink-3"} lg:text-center`}>
+                    {message || missing}
+                  </p>
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
       </div>
 
-      <div className="space-y-2">
-        <label htmlFor="preferredPerformerName" className="text-sm font-medium text-slate-800">
-          관심 있는 공연자 성함을 입력해 주세요. 없다면 '없음'을 입력해 주세요.
-        </label>
-        <input
-          id="preferredPerformerName"
-          type="text"
-          value={preferredPerformerName}
-          onChange={(e) => setPreferredPerformerName(e.target.value)}
-          placeholder="예: 홍길동 또는 없음"
-          className="w-full rounded border px-3 py-2 text-sm"
-        />
+      <div className="bottom-bar lg:hidden">
+        <div className="page flex items-center gap-4 py-3">
+          <div className="shrink-0">
+            <p className="text-cap text-ink-3">총 결제금액</p>
+            <p className="text-lead font-bold text-brand-600">{won(show.price)}</p>
+          </div>
+          <button type="button" onClick={submit} disabled={!ready || submitting} className="btn-primary btn-lg flex-1">
+            {submitLabel}
+          </button>
+        </div>
       </div>
-
-      <button
-        type="button"
-        onClick={submit}
-        disabled={!canSubmit || isSubmitting}
-        className="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {isSubmitting ? "예매 진행중..." : "예매하기"}
-      </button>
-
-      {message && <p className="text-sm text-slate-700">{message}</p>}
-    </section>
+    </main>
   );
 }

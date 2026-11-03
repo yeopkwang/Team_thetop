@@ -13,6 +13,8 @@ export function getToken(): string | null {
 export function setToken(token: string): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem("token", token);
+  // 다른 계정으로 바뀌었을 수 있으니, 헤더가 기억해 둔 관리자 여부를 버린다.
+  window.localStorage.removeItem("admin_role_cache_v1");
   window.dispatchEvent(new Event("storage"));
 }
 
@@ -36,6 +38,15 @@ export function clearAuthState(): void {
   window.localStorage.removeItem("admin_role_cache_v1");
   window.localStorage.removeItem(AUTH_PROVIDER_KEY);
   window.dispatchEvent(new Event("storage"));
+}
+
+// 서버가 돌려준 오류. status로 로그인 필요(401) 같은 경우를 가려낸다.
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
 }
 
 export async function apiFetch<T = unknown>(
@@ -72,7 +83,7 @@ export async function apiFetch<T = unknown>(
       typeof parsed === "object" && parsed && "error" in parsed
         ? String((parsed as { error?: string }).error || fallback)
         : fallback;
-    throw new Error(apiMessage);
+    throw new ApiError(response.status, apiMessage);
   }
 
   return parsed as T;

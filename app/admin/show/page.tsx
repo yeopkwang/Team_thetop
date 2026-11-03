@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import AdminNav from "@/components/AdminNav";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 
 type ShowForm = {
@@ -83,22 +83,36 @@ function toForm(show: NonNullable<AdminShowResponse["show"]>): ShowForm {
 function Field({
   label,
   hint,
+  className = "",
   children,
 }: {
   label: string;
   hint?: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <label className="block space-y-1 text-sm font-medium text-slate-800">
-      <span>{label}</span>
-      {children}
-      {hint && <span className="block text-xs font-normal text-slate-500">{hint}</span>}
+    <label className={`block ${className}`}>
+      <span className="label">{label}</span>
+      <span className="mt-1.5 block">{children}</span>
+      {hint && <span className="mt-1 block text-cap text-ink-3">{hint}</span>}
     </label>
   );
 }
 
-const inputClass = "w-full rounded border px-3 py-2 text-sm font-normal";
+function Group({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <section className="grid gap-4 border-t border-line py-8 first:border-t-0 first:pt-0 lg:grid-cols-[220px_1fr] lg:gap-10">
+      <div>
+        <h2 className="text-lead font-bold">{title}</h2>
+        {description && <p className="mt-1 text-meta text-ink-3">{description}</p>}
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
+const inputClass = "field";
 
 export default function AdminShowPage() {
   const [form, setForm] = useState<ShowForm>(EMPTY_FORM);
@@ -123,7 +137,7 @@ export default function AdminShowPage() {
   useEffect(() => {
     apiFetch<AdminShowResponse>("/admin/show")
       .then(apply)
-      .catch((error: unknown) => setMessage(error instanceof Error ? error.message : "공연 정보를 불러오지 못했습니다."))
+      .catch((error: unknown) => setMessage(error instanceof Error ? error.message : "공연 정보를 불러오지 못했어요."))
       .finally(() => setLoading(false));
   }, []);
 
@@ -151,42 +165,47 @@ export default function AdminShowPage() {
         },
       });
       apply(data);
-      setMessage("저장했습니다. 홈과 예매 화면에 바로 반영됩니다.");
+      setMessage("저장했어요. 홈과 예매 화면에 바로 반영돼요.");
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "저장하지 못했습니다.");
+      setMessage(error instanceof Error ? error.message : "저장하지 못했어요.");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <main className="container-base space-y-4">
-      <h1 className="text-2xl font-bold">공연 정보</h1>
-      <AdminNav />
-
+    <div>
       {loading ? (
-        <p className="text-sm text-slate-500">페이지를 준비하고 있습니다.</p>
+        <p className="py-16 text-center text-meta text-ink-3">불러오는 중</p>
       ) : (
-        <form onSubmit={save} className="space-y-4">
+        <form onSubmit={save}>
           {isNew && (
-            <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-              아직 등록된 공연이 없습니다. 저장하면 새 공연이 만들어집니다.
+            <p className="mb-6 rounded-md bg-wait-50 px-4 py-3 text-ui text-wait-700">
+              아직 등록된 공연이 없어요. 저장하면 새 공연이 만들어져요.
             </p>
           )}
 
-          <section className="space-y-3 rounded-2xl bg-white p-5 shadow">
-            <h2 className="text-lg font-semibold">판매</h2>
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <input type="checkbox" checked={form.isActive} onChange={(e) => set("isActive", e.target.checked)} />
-              홈·예매 화면에 공개하고 예매를 받습니다
+          <Group title="판매" description="공개를 끄면 홈에 '예매 중인 공연이 없어요'가 뜨고 예매도 막혀요.">
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-line p-4">
+              <input
+                type="checkbox"
+                checked={form.isActive}
+                onChange={(e) => set("isActive", e.target.checked)}
+                className="h-5 w-5 accent-brand-600"
+              />
+              <span>
+                <span className="block text-[15px] font-semibold">홈·예매 화면에 공개하고 예매 받기</span>
+                <span className="block text-meta text-ink-3">{form.isActive ? "지금 공개 중이에요" : "지금은 비공개예요"}</span>
+              </span>
             </label>
-            <div className="grid gap-3 md:grid-cols-3">
-              <Field label="공연 일시" hint="회차 정렬에 쓰입니다. 화면 문구는 아래 '일시'에 따로 적어 주세요.">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="공연 일시" hint="회차 정렬과 예매 화면에 쓰여요.">
                 <input type="datetime-local" className={inputClass} {...text("sessionDate")} />
               </Field>
-              <Field label="정원" hint={`현재 좌석을 잡고 있는 예매 ${reservedQty}건`}>
+              <Field label="정원" hint={`지금 좌석을 잡은 예매 ${reservedQty}건`}>
                 <input
                   type="number"
+                  inputMode="numeric"
                   min={1}
                   className={inputClass}
                   value={form.totalCapacity}
@@ -196,6 +215,7 @@ export default function AdminShowPage() {
               <Field label="관람료(원)">
                 <input
                   type="number"
+                  inputMode="numeric"
                   min={0}
                   className={inputClass}
                   value={form.price}
@@ -203,28 +223,31 @@ export default function AdminShowPage() {
                 />
               </Field>
             </div>
-          </section>
+          </Group>
 
-          <section className="space-y-3 rounded-2xl bg-white p-5 shadow">
-            <h2 className="text-lg font-semibold">공연 정보 카드</h2>
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="공연 제목">
+          <Group title="공연 정보" description="홈 화면 위쪽 포스터 옆 정보표에 나와요. 비워 둔 줄은 보이지 않아요.">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="공연 제목" className="sm:col-span-2">
                 <input className={inputClass} {...text("title")} />
               </Field>
-              <Field label="포스터 주소" hint="public 폴더 파일이면 /uploads/poster.png 처럼, 외부 이미지면 https:// 주소">
+              <Field
+                label="포스터 주소"
+                className="sm:col-span-2"
+                hint="public 폴더의 파일이면 /uploads/poster.png 처럼, 외부 이미지면 https:// 주소를 적어 주세요."
+              >
                 <input className={inputClass} {...text("posterUrl")} />
               </Field>
-              <Field label="일시">
+              <Field label="공연일">
                 <input className={inputClass} placeholder="2027년 02월 21일 (일)" {...text("dateLabel")} />
               </Field>
-              <Field label="시간">
+              <Field label="공연시간">
                 <input className={inputClass} placeholder="18:00 ~ 21:00" {...text("timeLabel")} />
               </Field>
-              <Field label="시간 보충 설명">
+              <Field label="공연시간 보충 설명">
                 <input className={inputClass} placeholder="인터미션 포함 / 입장 가능 17:30" {...text("timeSubLabel")} />
               </Field>
-              <Field label="입장 관련">
-                <input className={inputClass} placeholder="관객 100명 · 전원 스탠딩" {...text("audienceInfo")} />
+              <Field label="관람 안내">
+                <input className={inputClass} placeholder="관객 100명, 전원 스탠딩" {...text("audienceInfo")} />
               </Field>
               <Field label="장소">
                 <input className={inputClass} {...text("venue")} />
@@ -233,62 +256,66 @@ export default function AdminShowPage() {
                 <input className={inputClass} {...text("venueAddress")} />
               </Field>
               <Field label="문의 (이름)">
-                <input className={inputClass} {...text("contactName")} />
+                <input className={inputClass} placeholder="대표 홍길동" {...text("contactName")} />
               </Field>
               <Field label="문의 (SNS 등)">
-                <input className={inputClass} {...text("contactTag")} />
+                <input className={inputClass} placeholder="@band.bansong" {...text("contactTag")} />
+              </Field>
+              <Field label="정보표 아래 안내" className="sm:col-span-2">
+                <textarea rows={2} className={inputClass} {...text("notice")} />
               </Field>
             </div>
-            <Field label="안내 한 줄">
-              <textarea rows={2} className={inputClass} {...text("notice")} />
-            </Field>
-          </section>
+          </Group>
 
-          <section className="space-y-3 rounded-2xl bg-white p-5 shadow">
-            <h2 className="text-lg font-semibold">입금·환불</h2>
-            <div className="grid gap-3 md:grid-cols-2">
+          <Group title="입금·환불" description="예매 화면과 마이 티켓의 입금 안내에 나와요.">
+            <div className="grid gap-4 sm:grid-cols-3">
               <Field label="은행">
                 <input className={inputClass} {...text("paymentBank")} />
               </Field>
               <Field label="계좌번호">
-                <input className={inputClass} {...text("paymentAccount")} />
+                <input className={inputClass} inputMode="numeric" {...text("paymentAccount")} />
               </Field>
               <Field label="예금주">
                 <input className={inputClass} {...text("paymentHolder")} />
               </Field>
-              <Field label="환불 문의 연락처" hint="내 티켓 화면에서 환불 요청 후 이 번호로 연락하라고 안내합니다.">
-                <input className={inputClass} {...text("refundContact")} />
-              </Field>
             </div>
-          </section>
-
-          <section className="space-y-3 rounded-2xl bg-white p-5 shadow">
-            <h2 className="text-lg font-semibold">긴 안내문</h2>
-            <p className="text-xs text-slate-500">
-              빈 줄로 칸을 나눕니다. 칸의 첫 줄을 &quot;# 제목&quot;으로 쓰면 그 칸은 제목 붙은 상자로 보입니다.
-            </p>
-            <Field label="공연 소개 (셋리스트 등)">
-              <textarea rows={14} className={`${inputClass} font-mono`} {...text("introText")} />
+            <Field label="환불 문의 연락처" hint="관객이 환불을 요청하면 이 번호로 카카오톡을 보내라고 안내해요.">
+              <input className={inputClass} {...text("refundContact")} />
             </Field>
-            <Field label="판매 상세 (공연 개요, 관람료, 환불 기준, 입장 안내 등)">
-              <textarea rows={20} className={`${inputClass} font-mono`} {...text("salesText")} />
-            </Field>
-          </section>
+          </Group>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
-            >
-              {saving ? "저장 중..." : "저장"}
+          <Group
+            title="긴 안내문"
+            description="빈 줄로 묶음을 나눠요. 묶음의 첫 줄을 '# 제목'으로 쓰면 소제목이 붙어요."
+          >
+            <Field label="공연 소개 탭" hint="셋리스트, 밴드 소개 등">
+              <textarea rows={14} className={`${inputClass} font-mono text-ui`} {...text("introText")} />
+            </Field>
+            <Field label="판매 정보 탭" hint="공연 개요, 관람료, 환불 기준, 입장 안내 등">
+              <textarea rows={20} className={`${inputClass} font-mono text-ui`} {...text("salesText")} />
+            </Field>
+          </Group>
+
+          <div
+            className="sticky bottom-0 z-10 -mx-4 flex items-center gap-3 border-t border-line bg-white/95 px-4 pt-3 backdrop-blur md:-mx-6 md:px-6 lg:mx-0 lg:px-0"
+            style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}
+          >
+            <button type="submit" disabled={saving} className="btn-primary min-w-[120px]">
+              {saving ? "저장하는 중" : "저장"}
             </button>
-            {message && <p className="text-sm text-slate-700">{message}</p>}
+            <Link href="/" target="_blank" className="btn-ghost text-meta">
+              홈에서 보기
+            </Link>
+            {message && (
+              <p role="status" className="ml-auto text-right text-meta text-ink-2">
+                {message}
+              </p>
+            )}
           </div>
         </form>
       )}
 
-      {loading && message && <p className="text-sm text-slate-700">{message}</p>}
-    </main>
+      {loading && message && <p className="text-meta text-ink-2">{message}</p>}
+    </div>
   );
 }

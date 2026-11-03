@@ -1,41 +1,49 @@
 export const dynamic = "force-dynamic";
-import Link from "next/link";
-import ShowInfo from "@/components/ShowInfo";
+import EmptyState from "@/components/EmptyState";
 import ShowText from "@/components/ShowText";
-import { getCurrentShow } from "@/lib/show";
+import BookingPanel, { MobileBookingBar } from "@/components/show/BookingPanel";
+import { MobilePosterHero } from "@/components/show/Poster";
+import ShowSummary from "@/components/show/ShowSummary";
+import ShowTabs from "@/components/show/ShowTabs";
+import { getCurrentShow, getSessionAvailability } from "@/lib/show";
 
 export default async function HomePage() {
   const show = await getCurrentShow();
   if (!show) {
-    return <main className="container-base">지금 예매 중인 공연이 없습니다.</main>;
+    return (
+      <main className="page">
+        <EmptyState
+          title="지금 예매 중인 공연이 없어요"
+          description="다음 공연 예매가 열리면 이곳에서 바로 예매할 수 있어요."
+        />
+      </main>
+    );
   }
 
+  const sessions = await getSessionAvailability(show);
+  const tabs = [
+    show.introText && { id: "intro", label: "공연 소개", content: <ShowText text={show.introText} /> },
+    show.salesText && { id: "sales", label: "판매 정보", content: <ShowText text={show.salesText} /> },
+  ].filter(Boolean) as { id: string; label: string; content: React.ReactNode }[];
+
   return (
-    <main className="container-base space-y-6">
-      <ShowInfo show={show}>
-        <div className="pt-2">
-          <Link
-            href="/book"
-            className="inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-          >
-            예매하기
-          </Link>
+    <main className="pb-16">
+      <MobilePosterHero src={show.posterUrl} title={show.title} />
+
+      <div className="page lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-12 lg:pt-10">
+        <div className="min-w-0">
+          <ShowSummary show={show} />
+          <ShowTabs tabs={tabs} />
         </div>
-      </ShowInfo>
 
-      {show.introText && (
-        <section className="space-y-4 rounded-2xl bg-white p-5 shadow md:p-8">
-          <h2 className="text-xl font-bold">공연 소개</h2>
-          <ShowText text={show.introText} />
-        </section>
-      )}
+        <aside className="hidden lg:block">
+          <div className="sticky top-[calc(var(--header-h)+24px)]">
+            <BookingPanel sessions={sessions} price={show.price} />
+          </div>
+        </aside>
+      </div>
 
-      {show.salesText && (
-        <section className="space-y-4 rounded-2xl bg-white p-5 shadow md:p-8">
-          <h2 className="text-xl font-bold">판매 상세</h2>
-          <ShowText text={show.salesText} />
-        </section>
-      )}
+      <MobileBookingBar sessions={sessions} price={show.price} />
     </main>
   );
 }

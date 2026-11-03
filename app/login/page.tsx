@@ -1,38 +1,31 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import {
-  clearAuthState,
-  getAuthProvider,
-  setAuthProvider,
-  setToken,
-  apiFetch,
-} from "@/lib/api-client";
+import { KakaoIcon } from "@/components/icons";
+import Wordmark from "@/components/Wordmark";
+import { apiFetch, clearAuthState, getAuthProvider, setAuthProvider, setToken } from "@/lib/api-client";
 
-type MeResponse = {
-  user: { id: string; name?: string | null; email?: string | null; roles?: string[] };
-};
-
-type AuthResponse = {
-  token: string;
-  user: { id: string; name?: string | null; email?: string | null; roles?: string[] };
-};
+type User = { id: string; name?: string | null; email?: string | null; roles?: string[] };
 
 function LoginPageContent() {
   const searchParams = useSearchParams();
-
   const [message, setMessage] = useState("");
-  const [currentUser, setCurrentUser] = useState<MeResponse["user"] | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [checked, setChecked] = useState(false);
   const [loginId, setLoginId] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const refreshMe = async () => {
     try {
-      const data = await apiFetch<MeResponse>("/auth/me");
-      setCurrentUser(data.user);
+      const data = await apiFetch<{ user: User }>("/auth/me");
+      setUser(data.user);
     } catch {
-      setCurrentUser(null);
+      setUser(null);
+    } finally {
+      setChecked(true);
     }
   };
 
@@ -45,7 +38,6 @@ function LoginPageContent() {
     if (kakaoToken) {
       setToken(kakaoToken);
       setAuthProvider("kakao");
-      setMessage("카카오 로그인 성공");
       window.history.replaceState(null, "", "/login");
     }
     void refreshMe();
@@ -53,100 +45,130 @@ function LoginPageContent() {
 
   const handleAdminLogin = async (event: FormEvent) => {
     event.preventDefault();
-    setMessage("관리자 로그인 중...");
+    setSubmitting(true);
+    setMessage("");
     try {
-      const data = await apiFetch<AuthResponse>("/auth/login", {
+      const data = await apiFetch<{ token: string }>("/auth/login", {
         method: "POST",
-        bodyJson: { id: loginId.trim(), password: loginPassword },
+        bodyJson: { id: loginId.trim(), password },
       });
       setToken(data.token);
       setAuthProvider("admin");
-      setMessage("관리자 로그인 성공");
       await refreshMe();
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : "로그인 실패");
+      setMessage(error instanceof Error ? error.message : "로그인하지 못했어요.");
+    } finally {
+      setSubmitting(false);
     }
-  };
-
-  const handleKakaoLogin = () => {
-    window.location.href = "/api/auth/kakao/start";
   };
 
   const handleLogout = () => {
     const provider = getAuthProvider();
     clearAuthState();
-    setCurrentUser(null);
+    setUser(null);
     if (provider === "kakao") {
       window.location.href = "/api/auth/kakao/logout";
       return;
     }
-    setMessage("로그아웃 완료");
+    setMessage("로그아웃했어요.");
   };
 
+  const isAdmin = !!user?.roles?.some((r) => r === "ADMIN" || r === "SUPER_ADMIN");
+
   return (
-    <main className="container-base">
-      <section className="mx-auto max-w-xl rounded-2xl bg-white p-6 shadow space-y-6">
-        <h1 className="text-2xl font-bold">로그인</h1>
+    <main className="page pb-16">
+      <div className="mx-auto max-w-[400px] pt-12 lg:pt-20">
+        <div className="text-center">
+          <Wordmark className="text-[32px]" />
+          <p className="mt-2 text-ui text-ink-3">밴드 반송 공연 예매</p>
+        </div>
 
-        {currentUser ? (
-          <div className="rounded-xl border p-4 space-y-3">
-            <div className="text-sm text-slate-600">
-              {currentUser.name || "사용자"} ({currentUser.email || "-"}) 로그인됨
+        {!checked ? (
+          <div className="mt-10 h-14 animate-pulse rounded-md bg-surface" />
+        ) : user ? (
+          <section className="mt-10">
+            <div className="rounded-lg border border-line p-5 text-center">
+              <p className="text-lead font-bold">{user.name || "관객"}님</p>
+              <p className="mt-1 text-ui text-ink-3">{isAdmin ? "관리자 계정으로 로그인했어요." : "카카오 계정으로 로그인했어요."}</p>
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded bg-slate-200 px-3 py-2 text-sm font-semibold hover:bg-slate-300"
-            >
-              로그아웃
-            </button>
-          </div>
-        ) : (
-          <>
-            <section className="rounded-xl border p-4 space-y-3">
-              <h2 className="text-lg font-semibold">일반 사용자</h2>
-              <p className="text-sm text-slate-600">일반 사용자는 카카오 로그인만 지원합니다.</p>
-              <button
-                type="button"
-                onClick={handleKakaoLogin}
-                className="rounded bg-yellow-400 px-4 py-2 text-sm font-semibold text-black hover:bg-yellow-300"
-              >
-                카카오로 로그인
+            <div className="mt-4 grid gap-2">
+              {isAdmin ? (
+                <Link href="/admin" className="btn-primary btn-lg">
+                  관리자 페이지
+                </Link>
+              ) : (
+                <>
+                  <Link href="/myticket" className="btn-primary btn-lg">
+                    마이 티켓
+                  </Link>
+                  <Link href="/book" className="btn-secondary">
+                    예매하기
+                  </Link>
+                </>
+              )}
+              <button type="button" onClick={handleLogout} className="btn-ghost mx-auto text-meta">
+                로그아웃
               </button>
-            </section>
+            </div>
+          </section>
+        ) : (
+          <section className="mt-10">
+            <a
+              href="/api/auth/kakao/start"
+              className="btn btn-lg w-full rounded-md bg-kakao text-[16px] text-black/85 hover:brightness-95"
+            >
+              <KakaoIcon />
+              카카오 로그인
+            </a>
+            <p className="mt-3 text-center text-meta text-ink-3">관객은 카카오 계정으로 예매해요. 따로 가입할 필요는 없어요.</p>
 
-            <section className="rounded-xl border p-4 space-y-3">
-              <h2 className="text-lg font-semibold">관리자 로그인 (ID/PW)</h2>
-              <form onSubmit={handleAdminLogin} className="space-y-3">
-                <label className="block text-sm font-medium">
-                  관리자 ID
+            <details className="group mt-12 border-t border-line pt-5">
+              <summary className="flex cursor-pointer list-none items-center justify-center gap-1 text-meta font-semibold text-ink-3 hover:text-ink [&::-webkit-details-marker]:hidden">
+                운영진 로그인
+                <span className="transition-transform group-open:rotate-180" aria-hidden>
+                  ▾
+                </span>
+              </summary>
+              <form onSubmit={handleAdminLogin} className="mt-5 space-y-3">
+                <div>
+                  <label htmlFor="admin-id" className="label">
+                    아이디
+                  </label>
                   <input
+                    id="admin-id"
+                    autoComplete="username"
                     value={loginId}
                     onChange={(e) => setLoginId(e.target.value)}
-                    className="mt-1 w-full rounded border px-3 py-2"
-                    placeholder="관리자 ID"
+                    className="field mt-1.5"
                   />
-                </label>
-                <label className="block text-sm font-medium">
-                  비밀번호
+                </div>
+                <div>
+                  <label htmlFor="admin-pw" className="label">
+                    비밀번호
+                  </label>
                   <input
+                    id="admin-pw"
                     type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="mt-1 w-full rounded border px-3 py-2"
-                    placeholder="비밀번호"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="field mt-1.5"
                   />
-                </label>
-                <button type="submit" className="rounded bg-slate-900 px-4 py-2 text-white hover:bg-slate-800">
-                  관리자 로그인
+                </div>
+                <button type="submit" disabled={submitting || !loginId || !password} className="btn-primary w-full">
+                  {submitting ? "로그인하는 중" : "운영진 로그인"}
                 </button>
               </form>
-            </section>
-          </>
+            </details>
+          </section>
         )}
 
-        {message && <p className="text-sm text-slate-600">{message}</p>}
-      </section>
+        {message && (
+          <p role="status" className="mt-6 rounded-md bg-surface px-4 py-3 text-center text-meta text-ink-2">
+            {message}
+          </p>
+        )}
+      </div>
     </main>
   );
 }
